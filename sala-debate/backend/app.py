@@ -66,7 +66,7 @@ def init_topic():
     print("se inicializa la sala")
     room_session = get_or_create_Active_room_session(room_name,topic)
     if(room_session["primera_inicializacion"] == True):
-        print(f"id de la sala:{room_session["id"]}")
+        print(f"id de la sala:{room_session['id']}")
         #Recuperamos los ultimos promts para cada agente
         current_prompts = get_current_prompts()
         prompt_validador = (current_prompts.get("Clasificador","Prompt por defecto del clasificador")).replace("{tema}",topic)
@@ -131,7 +131,7 @@ def init_topic():
         return jsonify({"status":"initialized"}),201
 
     if(room_session["primera_inicializacion"] == False):
-        print(f"id de la sala ya inicializada:{room_session["id"]}")
+        print(f"id de la sala ya inicializada:{room_session['id']}")
         return jsonify({"status":"ya_inicializado"}),200
 
 @app.route("/api/close-room", methods=["POST"])

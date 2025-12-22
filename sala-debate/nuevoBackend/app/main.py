@@ -3,11 +3,17 @@ import io
 import matplotlib.pyplot as plt
 from datetime import datetime
 from uuid import UUID
+from pathlib import Path
 from fastapi import FastAPI,Request, Query
 from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from dotenv import load_dotenv
+
+# Cargar variables de entorno
+env_path = Path(__file__).parent / ".env"
+load_dotenv(env_path)
+
 from app.controllers.ChatSocketController import register_sockets, get_user_list
 from app.agentComponents.intermediario import Intermediario
 from app.agentComponents.intermediarioToulmin import IntermediarioToulmin   

@@ -2,6 +2,7 @@
 import uuid
 import os
 import enum
+from pathlib import Path
 from sqlalchemy import (
     Column, Integer, String, Text, DateTime, ForeignKey, func, select, JSON
 )
@@ -13,7 +14,8 @@ from dotenv import load_dotenv
 from datetime import datetime
 
 # Cargar variables de entorno
-load_dotenv()
+env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(env_path)
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Configuración de base de datos
