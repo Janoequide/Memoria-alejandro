@@ -15,8 +15,8 @@ env_path = Path(__file__).parent / ".env"
 load_dotenv(env_path)
 
 from app.controllers.ChatSocketController import register_sockets, get_user_list
-from app.agentComponents.intermediario import Intermediario
-from app.agentComponents.intermediarioToulmin import IntermediarioToulmin   
+from app.agentComponents.base_intermediario import BaseIntermediario
+from app.agentComponents.registry import get_intermediario_class
 from app.models.models import (
     get_latest_room_statuses,
     get_or_create_Active_room_session,
@@ -55,7 +55,7 @@ class TemaUpdate(BaseModel):
 
 load_dotenv()
 # Guardamos las salas activas , room_name -> Intermediario
-salas_activas: dict[str, Intermediario] = {}
+salas_activas: dict[str, BaseIntermediario] = {}
 
 # ---------------------------------------------------------
 # 1) Crear servidor socket.io en modo ASGI (async nativo)
@@ -105,83 +105,36 @@ def estado_salas():
 
 @app.post("/api/rooms/{room_name}/sessions", status_code=201)
 async def create_session(room_name: str, payload: dict):
-    """
-    Inicializa la sala y crea su Intermediario async si corresponde.
-    """
     topic = payload.get("prompt_inicial")
-    idioma = payload.get("idioma", "español")
     pipeline_type = payload.get("pipeline_type", "standard")
 
-    if not topic:
-        raise HTTPException(status_code=400, detail="Faltan 'prompt_inicial'")
-
-    if room_name in salas_activas:
-        return JSONResponse({"status": "already_exists"}, status_code=200)
-
-# Crear o recuperar session DB
     room_session = get_or_create_Active_room_session(room_name, topic)
-    room_session_id = room_session["id"]
-    primera = room_session.get("primera_inicializacion", False)
-
-    if not primera:
-        # ya existía
+    if not room_session.get("primera_inicializacion", False):
         return {"status": "ya_inicializado"}
 
-    # Recuperar prompts desde DB / config
     current_prompts = get_prompts_by_system(pipeline_type)
-    configuracion_multiagente = get_multiagent_config()
-    duracion_sesion = configuracion_multiagente.fase_segundos
-    update_interval = configuracion_multiagente.update_interval
-    if pipeline_type.lower() == "toulmin":
-        print("toulmin pipeline seleccionado")  
-        prompt_validador = (current_prompts.get("Validador")).replace("{tema}", topic)
-        prompt_orientador = (current_prompts.get("Orientador")).replace("{tema}", topic)
-        promtp_curador = (current_prompts.get("Curador")).replace("{tema}", topic)
-        # Config multiagente
-        tamaño_ventana_mensajes = configuracion_multiagente.ventana_mensajes
-        intermediario = IntermediarioToulmin(
-            prompt_validador=prompt_validador,
-            prompt_orientador=prompt_orientador,
-            prompt_agenteCurador=promtp_curador,
-            sio=sio,
-            sala=room_name,
-            room_session_id=room_session_id,
-            tamañoVentana=tamaño_ventana_mensajes
-        )
 
+    prompts_preparados = {k: v.replace("{tema}", topic) for k, v in current_prompts.items()}
+    
+    config_ma = get_multiagent_config()
 
-    elif pipeline_type.lower() == "standard":
-        print("se eligio standard pipeline")
-        prompt_validador = (current_prompts.get("Validador")).replace("{tema}", topic)
-        prompt_orientador = (current_prompts.get("Orientador")).replace("{tema}", topic)
-        
+    IntermediarioClass = get_intermediario_class(pipeline_type)
+    
+    intermediario = IntermediarioClass(
+        prompts=prompts_preparados,
+        sio=sio,
+        sala=room_name,
+        room_session_id=room_session["id"],
+        config_multiagente=config_ma
+    )
 
-        intermediario = Intermediario(
-            prompt_validador=prompt_validador,
-            prompt_orientador=prompt_orientador,
-            sio=sio,
-            sala=room_name,
-            room_session_id=room_session_id
-        )
-
-    # Guardar en memoria
     salas_activas[room_name] = intermediario
-
-    # Obtener usuarios (helper async de ChatSocketController)
     usuarios_sala = await get_user_list(room_name)
+    
+    await intermediario.start_session(topic, usuarios_sala, payload.get("idioma", "español"))
+    await intermediario.start_timer(config_ma.fase_segundos, config_ma.update_interval)
 
-    # Iniciar sesión 
-    await intermediario.start_session(topic, usuarios_sala, idioma)
-
-    # start timer (no bloqueante): crea task que corre el timer de forma asíncrona
-    # La función start_timer devuelve inmediatamente y lanza internamente una tarea
-    await intermediario.start_timer(duracion_sesion, update_interval)
-
-    # Emitir start_session y estado timer a la sala (igual lógica que antes)
-    await sio.emit("start_session", {"room": room_name, "users": usuarios_sala}, room=room_name)
-
-
-    return {"status": "created", "room": room_name, "session_id": room_session_id}
+    return {"status": "created", "room": room_name}
 
 @app.delete("/api/rooms/{room_name}/sessions/active")
 async def terminate_session(room_name: str):
@@ -327,10 +280,6 @@ def get_messages_by_session(session_id: UUID):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-
-
-
 def generate_day_plot(day: str) -> io.BytesIO:
     # 1. Obtener sesiones del día
     sessions = get_sessions_by_day_from_db(day)
@@ -401,8 +350,6 @@ def plot_sessions_day(day: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-
-
 @app.get("/api/topics")
 def list_topics():
     return get_temas()

@@ -3,17 +3,18 @@ from .qualityPipeline import QualityPipeline
 from .factory_agents import ReActAgentFactory
 
 class IntermediarioToulmin(BaseIntermediario):
-    def __init__(self, tamañoVentana, prompt_validador, prompt_curador, prompt_orientador, sio, sala, room_session_id):
+    def __init__(self, prompts: dict, sio, sala, room_session_id, config_multiagente=None):
         super().__init__(sio, sala, room_session_id)
+        
+        # Extraemos lo específico de Toulmin
+        self.tamañoVentana = config_multiagente.ventana_mensajes if config_multiagente else 5
+        
         self.pipeLine = QualityPipeline(
             factory=ReActAgentFactory(),
-            prompt_validador=prompt_validador,
-            prompt_curador=prompt_curador,
-            prompt_orientador=prompt_orientador
+            prompt_validador=prompts.get("Validador"),
+            prompt_curador=prompts.get("Curador"),
+            prompt_orientador=prompts.get("Orientador")
         )
-        self.tamañoVentana = tamañoVentana
-        self.numeroMensajes = 0
-        self.ids_mensajes_ventana = []
 
     async def agregarMensage(self, userName, message, user_message_id):
         self.hubo_mensaje_desde_ultimo_callback = True

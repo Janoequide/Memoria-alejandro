@@ -3,12 +3,13 @@ from .standardPipeline import StandardPipeline
 from .factory_agents import ReActAgentFactory
 
 class Intermediario(BaseIntermediario):
-    def __init__(self, prompt_validador, prompt_orientador, sio, sala, room_session_id):
+    def __init__(self, prompts: dict, sio, sala, room_session_id, config_multiagente=None):
         super().__init__(sio, sala, room_session_id)
+        
         self.pipeLine = StandardPipeline(
             factory=ReActAgentFactory(),
-            prompt_validador=prompt_validador,
-            prompt_orientador=prompt_orientador
+            prompt_validador=prompts.get("Validador"),
+            prompt_orientador=prompts.get("Orientador")
         )
 
     async def agregarMensage(self, userName, message, user_message_id):
