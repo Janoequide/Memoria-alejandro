@@ -3,7 +3,7 @@ import re
 from typing import Optional, List, Dict, Any
 from .timer import Timer  
 from .factory_agents import ReActAgentFactory  
-from .pipeline import Pipeline  
+from .standardPipeline import StandardPipeline  
 from app.models.models import (
     insert_message,
     SenderType
@@ -18,10 +18,10 @@ class Intermediario:
         room_session_id
     ):
         self.room_session_id = room_session_id
-        self.pipeLine = Pipeline(
+        self.pipeLine = StandardPipeline(
             factory=ReActAgentFactory(),
-            prompt_agenteValidador=prompt_agenteValidador,
-            promt_agenteOrientador=prompt_agenteOrientador
+            prompt_validador=prompt_agenteValidador,
+            prompt_orientador=prompt_agenteOrientador
         )
 
         self.sio = sio

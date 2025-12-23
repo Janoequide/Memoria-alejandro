@@ -3,7 +3,7 @@ import re
 from typing import Optional, List, Dict, Any
 from .timer import Timer  
 from .factory_agents import ReActAgentFactory  
-from .pipelineToulmin import PipelineToulmin
+from .qualityPipeline import QualityPipeline
 from app.models.models import (
     insert_message,
     SenderType
@@ -20,7 +20,7 @@ class IntermediarioToulmin:
         room_session_id
     ):
         self.room_session_id = room_session_id
-        self.pipeLine = PipelineToulmin(
+        self.pipeLine = QualityPipeline(
             factory=ReActAgentFactory(),
             prompt_agenteValidador=prompt_agenteValidador,
             promtp_agenteCurador=prompt_agenteCurador,
