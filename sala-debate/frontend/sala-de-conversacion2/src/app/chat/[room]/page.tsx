@@ -63,7 +63,7 @@ useEffect(() => {
 
   const fetchHistoricalMessages = async () => {
     try {
-      const res = await fetch(`${backend}/api/room-messages/${room}`);
+      const res = await fetch(`${backend}/api/rooms/${room}/messages`);
       if (!res.ok) return; // si no hay mensajes o error, no hacemos nada
 
       const data: {

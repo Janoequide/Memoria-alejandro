@@ -203,7 +203,7 @@ def listar_salas():
     rooms = get_rooms()
     return rooms
 
-@app.get("/api/room-messages/{room_name}")
+@app.get("/api/rooms/{room_name}/messages")
 def get_room_messages(room_name: str):
 
     id_session = get_active_room_session_id(room_name)
@@ -215,11 +215,11 @@ def get_room_messages(room_name: str):
 
     return messages
 
-@app.get("/api/rooms/{room}/timer")
-async def get_room_timer(room: str):
-    if room not in salas_activas:
+@app.get("/api/rooms/{room_name}/timer")
+async def get_room_timer(room_name: str):
+    if room_name not in salas_activas:
         raise HTTPException(404, "Room not found or inactive")
-    return salas_activas[room].get_timer_state()
+    return salas_activas[room_name].get_timer_state()
 
 @app.get("/api/prompts")
 async def get_prompts(request: Request):
