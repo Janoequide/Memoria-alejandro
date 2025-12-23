@@ -16,7 +16,7 @@ load_dotenv(env_path)
 
 from app.controllers.ChatSocketController import register_sockets, get_user_list
 from app.agentComponents.base_intermediario import BaseIntermediario
-from app.agentComponents.registry import get_intermediario_class
+from app.agentComponents.registry import INTERMEDIARIO_MAP, get_intermediario_class
 from app.models.models import (
     get_latest_room_statuses,
     get_or_create_Active_room_session,
@@ -372,3 +372,11 @@ def update_topic_by_id(topic_id: int, data: TemaCreate):
     if not actualizado:
         raise HTTPException(status_code=404, detail="Topic not found")
     return {"status": "updated"}
+
+@app.get("/api/pipelines")
+def get_pipelines():
+    """
+    Retorna la lista de identificadores de pipelines registrados
+    para que el frontend pueda llenar un selector/dropdown.
+    """
+    return list(INTERMEDIARIO_MAP.keys())

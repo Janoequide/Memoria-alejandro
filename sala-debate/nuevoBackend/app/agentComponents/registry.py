@@ -4,6 +4,7 @@ from .intermediarioToulmin import IntermediarioToulmin
 INTERMEDIARIO_MAP = {
     "standard": Intermediario,
     "toulmin": IntermediarioToulmin,
+    "placeholder": Intermediario
 }
 
 def get_intermediario_class(pipeline_type: str):

@@ -30,14 +30,33 @@ export default function RoomConfig({ backend }: RoomConfigProps) {
   const [availableRooms, setAvailableRooms] = useState<Room[]>([])
   const [roomStatuses, setRoomStatuses] = useState<RoomStatus[]>([])
   const [debateTopics, setDebateTopics] = useState<DebateTopic[]>([])
+  
+  // NUEVO: Estado para las pipelines que vienen del backend
+  const [availablePipelines, setAvailablePipelines] = useState<string[]>([])
+  
   const [room, setRoom] = useState('')
   const [topic, setTopic] = useState('')
   const [selectedCaseKey, setSelectedCaseKey] = useState('')
   const [idioma, setIdioma] = useState('español')
   const [pipeline, setPipeline] = useState("standard")
- 
 
-  // Fetch de salas
+  // Fetch de pipelines disponibles
+  const fetchPipelines = async () => {
+    try {
+      const res = await fetch(`${backend}/api/pipelines`)
+      if (!res.ok) throw new Error('Error al obtener pipelines')
+      const data = await res.json() // Recibe la lista de strings: ["standard", "toulmin", ...]
+      setAvailablePipelines(data)
+      
+      // Si la lista tiene elementos y el actual no está, ponemos el primero por defecto
+      if (data.length > 0 && !data.includes(pipeline)) {
+        setPipeline(data[0])
+      }
+    } catch (error) {
+      console.error('Error al cargar pipelines:', error)
+    }
+  }
+
   const fetchRooms = async () => {
     try {
       const res = await fetch(`${backend}/api/rooms`)
@@ -49,7 +68,6 @@ export default function RoomConfig({ backend }: RoomConfigProps) {
     }
   }
 
-  // Fetch de estado de salas
   const fetchStatuses = async () => {
     try {
       const res = await fetch(`${backend}/api/rooms/status`)
@@ -61,7 +79,6 @@ export default function RoomConfig({ backend }: RoomConfigProps) {
     }
   }
 
-  // Fetch de temas de debate
   const fetchDebateTopics = async () => {
     try {
       const res = await fetch(`${backend}/api/topics`)
@@ -77,9 +94,9 @@ export default function RoomConfig({ backend }: RoomConfigProps) {
     fetchRooms()
     fetchStatuses()
     fetchDebateTopics()
+    fetchPipelines() // <--- Nueva llamada al montar el componente
   }, [backend])
 
-  // Selección de tema
   const handleCaseChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const id = parseInt(e.target.value)
     const selected = debateTopics.find((t) => t.id === id)
@@ -196,15 +213,6 @@ export default function RoomConfig({ backend }: RoomConfigProps) {
             ))}
           </select>
         </div>
-
-        <div>
-          <button
-            onClick={handleEnter}
-            className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 transition w-full"
-          >
-            Entrar a la Sala
-          </button>
-        </div>
         
         <div className="mb-4">
           <label className="block mb-2 text-sm font-medium">Seleccionar idioma:</label>
@@ -217,16 +225,34 @@ export default function RoomConfig({ backend }: RoomConfigProps) {
             <option value="inglés">Inglés</option>
           </select>
         </div>
-        <div className="mb-4">
+
+        {/* --- MODIFICADO: Selector de sistema dinámico --- */}
+        <div className="mb-6">
           <label className="block mb-2 text-sm font-medium">Seleccionar tipo de sistema:</label>
           <select
-            className="border p-2 w-full rounded cursor-pointer"
+            className="border p-2 w-full rounded cursor-pointer capitalize"
             value={pipeline}
             onChange={(e) => setPipeline(e.target.value)}
           >
-            <option value="standard">Pipeline estándar</option>
-            <option value="toulmin">Pipeline Toulmin</option>
+            {availablePipelines.map((p) => (
+              <option key={p} value={p}>
+                Pipeline {p}
+              </option>
+            ))}
+            {availablePipelines.length === 0 && (
+              <option value="">Cargando sistemas...</option>
+            )}
           </select>
+        </div>
+
+        <div>
+          <button
+            onClick={handleEnter}
+            disabled={!room || !topic || availablePipelines.length === 0}
+            className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 transition w-full disabled:bg-gray-400"
+          >
+            Entrar a la Sala
+          </button>
         </div>
 
       </div>
