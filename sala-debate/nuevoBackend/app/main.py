@@ -95,7 +95,7 @@ register_sockets(sio, salas_activas)
 app.mount("/socket.io", socket_app)
 
 
-@app.get("/api/estado-salas")
+@app.get("/api/rooms/status")
 def estado_salas():
     try:
         statuses = get_latest_room_statuses()

@@ -52,7 +52,7 @@ export default function RoomConfig({ backend }: RoomConfigProps) {
   // Fetch de estado de salas
   const fetchStatuses = async () => {
     try {
-      const res = await fetch(`${backend}/api/estado-salas`)
+      const res = await fetch(`${backend}/api/rooms/status`)
       if (!res.ok) throw new Error('Error al obtener estado de salas')
       const data = await res.json()
       setRoomStatuses(data)
