@@ -64,7 +64,7 @@ export default function LobbyPage() {
   }
 
   const startRoom = async () => {
-    // Empieza la sala: POST a /api/init-topic
+    // Empieza la sala: POST a /api/rooms/{room_name}/sessions
     if (!socketRef.current) return
     setStarting(true)
     try {
@@ -72,7 +72,7 @@ export default function LobbyPage() {
       const idioma = sessionStorage.getItem('chatIdioma') || 'español'
       const pipelineType = sessionStorage.getItem('pipelineType') || 'standard'
 
-      const res = await fetch(`${backend}/api/init-topic`, {
+      const res = await fetch(`${backend}/api/rooms/${room}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ room, prompt_inicial: prompt,idioma,pipeline_type: pipelineType }),

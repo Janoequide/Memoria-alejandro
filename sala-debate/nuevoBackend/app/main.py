@@ -103,11 +103,89 @@ def estado_salas():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/init-topic")
-async def init_topic(payload: dict):
+@app.post("/api/rooms/{room_name}/sessions", status_code=201)
+async def create_session(room_name: str, payload: dict):
     """
     Inicializa la sala y crea su Intermediario async si corresponde.
     """
+    topic = payload.get("prompt_inicial")
+    idioma = payload.get("idioma", "español")
+    pipeline_type = payload.get("pipeline_type", "standard")
+
+    if not topic:
+        raise HTTPException(status_code=400, detail="Faltan 'prompt_inicial'")
+
+    if room_name in salas_activas:
+        return JSONResponse({"status": "already_exists"}, status_code=200)
+
+# Crear o recuperar session DB
+    room_session = get_or_create_Active_room_session(room_name, topic)
+    room_session_id = room_session["id"]
+    primera = room_session.get("primera_inicializacion", False)
+
+    if not primera:
+        # ya existía
+        return {"status": "ya_inicializado"}
+
+    # Recuperar prompts desde DB / config
+    current_prompts = get_prompts_by_system(pipeline_type)
+    configuracion_multiagente = get_multiagent_config()
+    duracion_sesion = configuracion_multiagente.fase_segundos
+    update_interval = configuracion_multiagente.update_interval
+    if pipeline_type.lower() == "toulmin":
+        print("toulmin pipeline seleccionado")  
+        prompt_validador = (current_prompts.get("Validador")).replace("{tema}", topic)
+        prompt_orientador = (current_prompts.get("Orientador")).replace("{tema}", topic)
+        promtp_curador = (current_prompts.get("Curador")).replace("{tema}", topic)
+        # Config multiagente
+        tamaño_ventana_mensajes = configuracion_multiagente.ventana_mensajes
+        intermediario = IntermediarioToulmin(
+            prompt_agenteValidador=prompt_validador,
+            prompt_agenteOrientador=prompt_orientador,
+            prompt_agenteCurador=promtp_curador,
+            sio=sio,
+            sala=room_name,
+            room_session_id=room_session_id,
+            tamañoVentana=tamaño_ventana_mensajes
+        )
+
+
+    elif pipeline_type.lower() == "standard":
+        print("se eligio standard pipeline")
+        prompt_validador = (current_prompts.get("Validador")).replace("{tema}", topic)
+        prompt_orientador = (current_prompts.get("Orientador")).replace("{tema}", topic)
+        
+
+        intermediario = Intermediario(
+            prompt_agenteValidador=prompt_validador,
+            prompt_agenteOrientador=prompt_orientador,
+            sio=sio,
+            sala=room_name,
+            room_session_id=room_session_id
+        )
+
+    # Guardar en memoria
+    salas_activas[room_name] = intermediario
+
+    # Obtener usuarios (helper async de ChatSocketController)
+    usuarios_sala = await get_user_list(room_name)
+
+    # Iniciar sesión 
+    await intermediario.start_session(topic, usuarios_sala, idioma)
+
+    # start timer (no bloqueante): crea task que corre el timer de forma asíncrona
+    # La función start_timer devuelve inmediatamente y lanza internamente una tarea
+    await intermediario.start_timer(duracion_sesion, update_interval)
+
+    # Emitir start_session y estado timer a la sala (igual lógica que antes)
+    await sio.emit("start_session", {"room": room_name, "users": usuarios_sala}, room=room_name)
+
+
+    return {"status": "created", "room": room_name, "session_id": room_session_id}
+
+"""
+@app.post("/api/init-topic")
+async def init_topic(payload: dict):
 
     room_name = payload.get("room")
     topic = payload.get("prompt_inicial")
@@ -186,7 +264,24 @@ async def init_topic(payload: dict):
 
 
     return {"status": "initialized"}
+"""
 
+@app.delete("/api/rooms/{room_name}/sessions/active")
+async def terminate_session(room_name: str):
+    try:
+        result = close_active_room_session(room_name)
+        if not result:
+            raise HTTPException(status_code=404, detail="No active session found")
+
+        if room_name in salas_activas:
+            await salas_activas[room_name].stop_session()
+            del salas_activas[room_name]
+
+        return {"status": "terminated"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+"""
 @app.post("/api/close-room")
 async def close_room(payload: dict):
     room_name = payload.get("room")
@@ -212,7 +307,8 @@ async def close_room(payload: dict):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+"""
+
 @app.get("/api/temas")
 def listar_temas():
     """

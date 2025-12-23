@@ -3,8 +3,7 @@ Titulo-Trabajo
 
 # Instrucciones de uso
 - Front: 
-    - `cd sala-debate\frontend\sala-de-conversacion2`
-    - `npm i; npm run dev`
+    - `cd sala-debate\frontend\sala-de-conversacion2; npm i; npm run dev`
 - NuevoBack: 
     - Crear .env usando el .env.example
     - `cd sala-debate\nuevoBackend`
@@ -15,3 +14,4 @@ Titulo-Trabajo
     - crear la bd
         - `psql -U postgres -f .\db.sql`
     - `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
+    - `cd sala-debate\nuevoBackend; app/.venv\Scripts\activate; uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
