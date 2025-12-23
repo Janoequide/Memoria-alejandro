@@ -106,8 +106,8 @@ export default function RoomConfig({ backend }: RoomConfigProps) {
     if (!confirm(`¿Deseas cerrar la sala "${roomName}"?`)) return
 
     try {
-      const res = await fetch(`${backend}/api/close-room`, {
-        method: 'POST',
+      const res = await fetch(`${backend}/api/rooms/${roomName}/sessions/active`, {
+        method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ room: roomName }),
       })
