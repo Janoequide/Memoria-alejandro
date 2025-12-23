@@ -65,11 +65,15 @@ class BaseIntermediario(ABC):
 
     # --- Lógica de Sesión Común ---
     async def start_session(self, topic: str, usuarios_sala: list, idioma: str):
-        respuesta = await self.pipeLine.start_session(topic, usuarios_sala, idioma)
-        contenido = respuesta[0].get("respuesta", "") if isinstance(respuesta, list) else str(respuesta)
+        """Inicia la sesión y procesa todas las respuestas iniciales del pipeline."""
+        respuestas = await self.pipeLine.start_session(topic, usuarios_sala, idioma)
         
-        self._insert_in_db(agent_name="Orientador", content=contenido)
-        await self.sio.emit("evaluacion", respuesta, room=self.sala)
+        # Iteramos sobre las respuestas para persistirlas y emitirlas
+        if respuestas:
+            for r in respuestas:
+                self._insert_in_db(agent_name=r["agente"], content=r["respuesta"])
+            
+            await self.sio.emit("evaluacion", respuestas, room=self.sala)
 
     # --- Callbacks y Eventos ---
     async def callback(self, elapsed_time: int, remaining_time: int, hito_alcanzado: Optional[int] = None):
@@ -96,19 +100,22 @@ class BaseIntermediario(ABC):
             logger.error(f"[Error callback timer {self.sala}]: {e}")
 
     async def _manejar_hito_temporal(self, hito: int, elapsed_time: int, remaining_time: int):
-        mensajes = {
-            25: "Se ha cumplido un cuarto del tiempo. Verifiquen la participación.",
-            50: "Mitad del tiempo. Aseguren argumentos principales y busquen consenso.",
-            75: "Tres cuartos cumplidos. Consoliden posiciones y conclusiones.",
-            100: "Tiempo finalizado. Resuman los puntos principales."
+        """Procesa hitos de tiempo delegando la autoría al pipeline."""
+        mensajes_base = {
+            25: "Se ha cumplido un cuarto del tiempo.",
+            50: "Mitad del tiempo transcurrido.",
+            75: "Queda un cuarto del tiempo.",
+            100: "Tiempo finalizado."
         }
-        msg_base = mensajes.get(hito, f"Hito {hito}% alcanzado.")
-        respuesta = await self.pipeLine.mensaje_hito_temporal(hito, msg_base, elapsed_time, remaining_time)
+        msg_base = mensajes_base.get(hito, f"Hito {hito}% alcanzado.")
         
-        if respuesta:
-            contenido = respuesta[0].get("respuesta", "") if isinstance(respuesta, list) else str(respuesta)
-            self._insert_in_db(agent_name="Orientador", content=contenido)
-            await self.sio.emit("evaluacion", respuesta, room=self.sala)
+        # El pipeline decide qué agente responde al hito
+        respuestas = await self.pipeLine.mensaje_hito_temporal(hito, msg_base, elapsed_time, remaining_time)
+        
+        if respuestas:
+            for r in respuestas:
+                self._insert_in_db(agent_name=r["agente"], content=r["respuesta"])
+            await self.sio.emit("evaluacion", respuestas, room=self.sala)
 
     # --- Helpers ---
     def _insert_in_db(self, agent_name, content, parent_id=None, used_ids=None):
