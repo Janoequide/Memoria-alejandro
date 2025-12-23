@@ -230,15 +230,11 @@ def get_room_messages(room_name: str):
 
     return messages
 
-
-@app.get("/api/timer-state/{room}")
-async def timer_state(room: str):
+@app.get("/api/rooms/{room}/timer")
+async def get_room_timer(room: str):
     if room not in salas_activas:
-        raise HTTPException(404, "Sala no encontrada")
+        raise HTTPException(404, "Room not found or inactive")
     return salas_activas[room].get_timer_state()
-
-
-
 
 @app.get("/api/prompts")
 async def get_prompts(request: Request):

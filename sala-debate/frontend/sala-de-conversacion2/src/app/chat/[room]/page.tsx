@@ -299,7 +299,7 @@ useEffect(() => {
 
   async function fetchTimer() {
     try {
-      const res = await fetch(`${backend}/api/timer-state/${room}`);
+      const res = await fetch(`${backend}/api/rooms/${room}/timer`);
       if (!res.ok) return;
 
       const data = await res.json();
