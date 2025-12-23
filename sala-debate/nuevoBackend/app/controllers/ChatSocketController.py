@@ -94,11 +94,12 @@ def register_sockets(sio:socketio.AsyncServer, salas_activas):
         await sio.leave_room(sid, room)
         await remove_user(room, username, sid)
 
+        """
         # Avisar al Intermediario
         intermediario: Intermediario = salas_activas.get(room)
         if intermediario:
             await intermediario.anunciar_salida_participante(username)
-
+        """
         updated = await get_user_list(room)
         await sio.emit("users_update", updated, room=room)
 

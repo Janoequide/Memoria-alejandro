@@ -140,8 +140,8 @@ async def create_session(room_name: str, payload: dict):
         # Config multiagente
         tamaño_ventana_mensajes = configuracion_multiagente.ventana_mensajes
         intermediario = IntermediarioToulmin(
-            prompt_agenteValidador=prompt_validador,
-            prompt_agenteOrientador=prompt_orientador,
+            prompt_validador=prompt_validador,
+            prompt_orientador=prompt_orientador,
             prompt_agenteCurador=promtp_curador,
             sio=sio,
             sala=room_name,
@@ -157,8 +157,8 @@ async def create_session(room_name: str, payload: dict):
         
 
         intermediario = Intermediario(
-            prompt_agenteValidador=prompt_validador,
-            prompt_agenteOrientador=prompt_orientador,
+            prompt_validador=prompt_validador,
+            prompt_orientador=prompt_orientador,
             sio=sio,
             sala=room_name,
             room_session_id=room_session_id

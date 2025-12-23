@@ -57,6 +57,13 @@ class BasePipeline(ABC):
             return False
 
     # --- Lógica de Sesión ---
+    async def set_hub(self, tema_sala: str, usuarios_sala: list, idioma: str):
+        self.tema_sala = tema_sala
+        hint_text = self._generar_prompt_inicio(usuarios_sala, idioma)
+        
+        hint = Msg(name="Host", role="system", content=hint_text)
+        self.hub = await MsgHub(participants=self.agentes, announcement=hint).__aenter__()
+    
     def _generar_prompt_inicio(self, usuarios_sala: list, idioma: str) -> str:
         """Genera el bloque de texto estándar incluyendo el TEMA de la sala."""
         participantes_text = "\n".join(f"- {u}" for u in usuarios_sala) if usuarios_sala else "Ninguno"

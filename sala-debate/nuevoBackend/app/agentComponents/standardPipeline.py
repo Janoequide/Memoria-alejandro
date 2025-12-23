@@ -15,12 +15,8 @@ class StandardPipeline(BasePipeline):
         self.agentes = [self.agenteValidador, self.agenteOrientador]
 
     async def start_session(self, tema_sala: str, usuarios_sala: list, idioma: str):
-        self.tema_sala = tema_sala
-        hint_text = self._generar_prompt_inicio(usuarios_sala, idioma)
+        await self.set_hub(tema_sala, usuarios_sala, idioma)
         
-        hint = Msg(name="Host", role="system", content=hint_text)
-        self.hub = await MsgHub(participants=self.agentes, announcement=hint).__aenter__()
-
         # Lógica de bienvenida
         mensaje = Msg(name="Host", role="system", content="Sesión iniciada. Orientador, explica el objetivo.")
         await self._broadcast(mensaje)

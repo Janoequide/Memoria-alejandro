@@ -16,11 +16,7 @@ class QualityPipeline(BasePipeline):
         self.agentes = [self.agenteCurador, self.agenteOrientador]
 
     async def start_session(self, tema_sala: str, usuarios_sala: list, idioma: str):
-        self.tema_sala = tema_sala
-        hint_text = self._generar_prompt_inicio(usuarios_sala, idioma)
-        
-        hint = Msg(name="Host", role="system", content=hint_text)
-        self.hub = await MsgHub(participants=self.agentes, announcement=hint).__aenter__()
+        await self.set_hub(tema_sala, usuarios_sala, idioma)
         
         # Lógica específica de inicio
         inicio_msg = Msg(name="Host", role="system", content="La sesión ha comenzado. Orientador, da la bienvenida.")
