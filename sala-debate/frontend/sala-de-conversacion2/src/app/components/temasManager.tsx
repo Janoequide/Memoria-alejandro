@@ -30,7 +30,7 @@ export default function TemasManager({ backend }: TemasManagerProps) {
   const fetchTemas = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`${backend}/api/temas`)
+      const res = await fetch(`${backend}/api/topics`)
       if (!res.ok) throw new Error('Error al obtener los temas')
       const data = await res.json()
       setTemas(data)
@@ -56,7 +56,7 @@ export default function TemasManager({ backend }: TemasManagerProps) {
     e.preventDefault()
     try {
       const method = editingId ? 'PUT' : 'POST'
-  
+      const endpoint = editingId ? `/${editingId}` : ''
       // Sanitización del texto
       const sanitizedTemaText = form.tema_text
         .replace(/\\/g, '\\\\')
@@ -67,7 +67,7 @@ export default function TemasManager({ backend }: TemasManagerProps) {
         ? { id: editingId, titulo: form.titulo, tema_text: sanitizedTemaText }
         : { titulo: form.titulo, tema_text: sanitizedTemaText }
   
-      const res = await fetch(`${backend}/api/temas`, {
+      const res = await fetch(`${backend}/api/topics${endpoint}`, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)

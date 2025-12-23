@@ -64,7 +64,7 @@ export default function RoomConfig({ backend }: RoomConfigProps) {
   // Fetch de temas de debate
   const fetchDebateTopics = async () => {
     try {
-      const res = await fetch(`${backend}/api/temas`)
+      const res = await fetch(`${backend}/api/topics`)
       if (!res.ok) throw new Error('Error al obtener los temas de debate')
       const data = await res.json()
       setDebateTopics(data)

@@ -198,21 +198,6 @@ async def terminate_session(room_name: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/temas")
-def listar_temas():
-    """
-    GET -> Obtener todos los temas guardados
-    """
-    temas = get_temas()
-    return temas
-
-@app.get("/api/tema/{room}")
-def obtener_tema(room: str):
-    topic = get_active_room_topic(room)
-    if topic is None:
-        raise HTTPException(status_code=404, detail={"tema": "sin tema definido"})
-    return {"tema": topic}
-
 @app.get("/api/rooms")
 def listar_salas():
     rooms = get_rooms()
@@ -418,23 +403,25 @@ def plot_sessions_day(day: str):
     
 
 
-@app.get("/api/temas")
-def obtener_temas():
-    temas = get_temas()
-    return temas
+@app.get("/api/topics")
+def list_topics():
+    return get_temas()
 
+@app.get("/api/topics/{room}")
+def obtener_tema(room: str):
+    topic = get_active_room_topic(room)
+    if topic is None:
+        raise HTTPException(status_code=404, detail={"tema": "sin tema definido"})
+    return {"tema": topic}
 
-@app.post("/api/temas", status_code=201)
-def crear_tema(data: TemaCreate):
-    tema_id = insert_tema(data.titulo, data.tema_text)
-    return {"status": "success", "id": tema_id}
+@app.post("/api/topics", status_code=201)
+def create_topic(data: TemaCreate):
+    topic_id = insert_tema(data.titulo, data.tema_text)
+    return {"id": topic_id, "status": "created"}
 
-
-@app.put("/api/temas")
-def actualizar_tema(data: TemaUpdate):
-    actualizado = update_tema(data.id, data.titulo, data.tema_text)
-    
+@app.put("/api/topics/{topic_id}")
+def update_topic_by_id(topic_id: int, data: TemaCreate):
+    actualizado = update_tema(topic_id, data.titulo, data.tema_text)
     if not actualizado:
-        raise HTTPException(status_code=404, detail="No se encontró el tema con ese ID")
-
-    return {"status": "success", "id": data.id}
+        raise HTTPException(status_code=404, detail="Topic not found")
+    return {"status": "updated"}

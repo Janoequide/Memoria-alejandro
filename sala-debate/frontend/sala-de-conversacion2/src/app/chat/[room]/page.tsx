@@ -53,7 +53,7 @@ export default function ChatRoom() {
   }, [room, router])
   
   useEffect(() => {
-    fetch(`${backend}/api/tema/${room}`)
+    fetch(`${backend}/api/topics/${room}`)
     .then((res) => res.json())
     .then((data) => setTema(data.tema))
   }, [room])
