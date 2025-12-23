@@ -19,7 +19,7 @@ export default function PromptsPage() {
   // Obtener lista de agentes disponibles
   const fetchAgents = async () => {
     try {
-      const res = await fetch(`${backend}/api/cuantosagentes?system_type=${pipelineType}`)
+      const res = await fetch(`${backend}/api/agents?system_type=${pipelineType}`)
 
 
       if (!res.ok) throw new Error('Error al obtener agentes')
