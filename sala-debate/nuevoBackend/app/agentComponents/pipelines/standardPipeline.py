@@ -33,7 +33,7 @@ class StandardPipeline(BasePipeline):
         res_val = await self._call_agent(self.agenteValidador, mensaje)
         texto_val = self.ensure_text(self.extract_content(res_val))
         
-        respuestas = [{"agente": "Curador", "respuesta": texto_val}]
+        respuestas = [{"agente": "Validador", "respuesta": texto_val}]
         
         if filter_agents(texto_val, self.agentes):
             res_ori = await self._call_agent(self.agenteOrientador)
