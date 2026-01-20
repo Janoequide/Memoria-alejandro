@@ -20,6 +20,11 @@ class BasePipeline(ABC):
         self.hub = None
         self.agentes = []
         self.tema_sala = None
+    
+    # Hacer disponible formato_tiempo como método
+    def formato_tiempo(self, segundos: int) -> str:
+        """Convierte segundos a formato legible (ej: '2 minutos y 30 segundos')"""
+        return formato_tiempo(segundos)
 
     # --- Métodos de ejecución protegidos ---
     async def _call_agent(self, agent, msg: Msg | None = None):

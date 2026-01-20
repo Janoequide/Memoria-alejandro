@@ -447,13 +447,15 @@ def get_all_agents_by_pipeline(system_type: str) -> list[str]:
 def get_prompts_by_system(system_type: str):
     """
     Retorna los prompts más recientes por agente según system_type.
+    Selecciona el registro con el ID más alto (más reciente) para evitar
+    problemas de comparación de timestamps con microsegundos.
     """
     session = Session()
     try:
         subquery = (
             select(
                 AgentPrompt.agent_name,
-                func.max(AgentPrompt.created_at).label("latest")
+                func.max(AgentPrompt.id).label("latest_id")
             )
             .where(AgentPrompt.system_type == system_type)
             .group_by(AgentPrompt.agent_name)
@@ -465,7 +467,7 @@ def get_prompts_by_system(system_type: str):
             .join(
                 subquery,
                 (AgentPrompt.agent_name == subquery.c.agent_name) &
-                (AgentPrompt.created_at == subquery.c.latest)
+                (AgentPrompt.id == subquery.c.latest_id)
             )
         )
 

@@ -1,10 +1,11 @@
 from .intermediarios.intermediarioStandard import IntermediarioStandard
 from .intermediarios.intermediarioToulmin import IntermediarioToulmin
+from .intermediarios.intermediarioAbogado import IntermediarioAbogado
 
 INTERMEDIARIO_MAP = {
     "standard": IntermediarioStandard,
     "toulmin": IntermediarioToulmin,
-    "abogado del diablo": IntermediarioStandard
+    "abogado-del-diablo": IntermediarioAbogado
 }
 
 def get_intermediario_class(pipeline_type: str):

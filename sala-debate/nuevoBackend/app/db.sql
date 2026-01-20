@@ -1,3 +1,7 @@
+-- 0. Si estaba creado, en la terminal:
+psql -U chat_user -d chatdb -h localhost
+chat_user_password
+
 -- 1. Crear el usuario
 CREATE USER chat_user WITH PASSWORD 'chat_user_password';
 
