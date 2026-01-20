@@ -15,7 +15,7 @@ env_path = Path(__file__).parent / ".env"
 load_dotenv(env_path)
 
 from app.controllers.ChatSocketController import register_sockets, get_user_list
-from app.agentComponents.base_intermediario import BaseIntermediario
+from app.agentComponents.intermediarios.base_intermediario import BaseIntermediario
 from app.agentComponents.registry import INTERMEDIARIO_MAP, get_intermediario_class
 from app.models.models import (
     get_latest_room_statuses,

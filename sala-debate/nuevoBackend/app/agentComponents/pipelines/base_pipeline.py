@@ -4,7 +4,7 @@ import json
 import os
 from abc import ABC, abstractmethod
 from datetime import datetime
-from .utils.utilsForAgents import formato_tiempo
+from ..utils.utilsForAgents import formato_tiempo
 from agentscope.message import Msg
 from agentscope.pipeline import MsgHub
 
@@ -100,7 +100,7 @@ class BasePipeline(ABC):
 
     async def reactiveResponse(self, usuario: str, mensaje: str, agent_name: str = "Orientador"):
         """Respuesta genérica cuando un usuario invoca a un agente específico."""
-        from .utils.utilsForAgents import sanitize_name
+        from ..utils.utilsForAgents import sanitize_name
         
         msg_usuario = Msg(name=sanitize_name(usuario), role="user", content=mensaje)
         await self._broadcast(msg_usuario)

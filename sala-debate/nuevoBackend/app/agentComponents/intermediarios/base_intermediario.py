@@ -3,7 +3,7 @@ import re
 import logging
 from typing import Optional, List, Dict, Any
 from abc import ABC, abstractmethod
-from .timer import Timer
+from ..timer import Timer
 from app.models.models import insert_message, SenderType
 
 logger = logging.getLogger("base_intermediario")

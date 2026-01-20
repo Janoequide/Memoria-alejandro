@@ -1,12 +1,12 @@
-from .intermediario import Intermediario
-from .intermediarioToulmin import IntermediarioToulmin
+from .intermediarios.intermediarioStandard import IntermediarioStandard
+from .intermediarios.intermediarioToulmin import IntermediarioToulmin
 
 INTERMEDIARIO_MAP = {
-    "standard": Intermediario,
+    "standard": IntermediarioStandard,
     "toulmin": IntermediarioToulmin,
-    "abogado del diablo": Intermediario
+    "abogado del diablo": IntermediarioStandard
 }
 
 def get_intermediario_class(pipeline_type: str):
     """Devuelve la clase del intermediario o la estándar por defecto."""
-    return INTERMEDIARIO_MAP.get(pipeline_type.lower(), Intermediario)
+    return INTERMEDIARIO_MAP.get(pipeline_type.lower(), IntermediarioStandard)

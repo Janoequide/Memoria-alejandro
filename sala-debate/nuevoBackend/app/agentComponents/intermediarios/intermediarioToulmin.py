@@ -1,6 +1,6 @@
 from .base_intermediario import BaseIntermediario
-from .qualityPipeline import QualityPipeline
-from .factory_agents import ReActAgentFactory
+from ..pipelines.qualityPipeline import QualityPipeline
+from ..factory_agents import ReActAgentFactory
 
 class IntermediarioToulmin(BaseIntermediario):
     def __init__(self, prompts: dict, sio, sala, room_session_id, config_multiagente=None):

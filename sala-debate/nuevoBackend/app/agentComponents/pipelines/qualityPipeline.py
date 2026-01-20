@@ -1,6 +1,6 @@
 import logging
 from .base_pipeline import BasePipeline
-from .utils.utilsForAgents import *
+from ..utils.utilsForAgents import *
 from agentscope.message import Msg
 from agentscope.pipeline import MsgHub
 

@@ -1,8 +1,7 @@
 from .base_intermediario import BaseIntermediario
-from .standardPipeline import StandardPipeline
-from .factory_agents import ReActAgentFactory
-
-class Intermediario(BaseIntermediario):
+from ..pipelines.standardPipeline import StandardPipeline
+from ..factory_agents import ReActAgentFactory
+class IntermediarioStandard(BaseIntermediario):
     def __init__(self, prompts: dict, sio, sala, room_session_id, config_multiagente=None):
         super().__init__(sio, sala, room_session_id)
         

@@ -5,7 +5,7 @@ from app.models.models import (
     insert_message,
     SenderType
 )
-from app.agentComponents.intermediario import Intermediario
+from app.agentComponents.intermediarios.base_intermediario import BaseIntermediario
 
 # Estructura: lobby_users[room][username] = set(sid)
 lobby_users: dict[str, dict[str, set[str]]] = {}
@@ -135,7 +135,7 @@ def register_sockets(sio:socketio.AsyncServer, salas_activas):
         )
 
         # Enviar al Intermediario
-        intermediario: Intermediario = salas_activas.get(room)
+        intermediario: BaseIntermediario = salas_activas.get(room)
         if not intermediario:
             await sio.emit(
                 "error",
@@ -212,7 +212,7 @@ def register_sockets(sio:socketio.AsyncServer, salas_activas):
         )
 
         # enviar estado inicial del timer SOLO al que inició la sesión
-        intermediario: Intermediario = salas_activas.get(room)
+        intermediario: BaseIntermediario = salas_activas.get(room)
 
         if intermediario:
             try:
