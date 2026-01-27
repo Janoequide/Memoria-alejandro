@@ -15,12 +15,18 @@ class AbogadoPipeline(BasePipeline):
     La diferencia principal está en los prompts que recibe de la BD,
     que deben estar diseñados para fomentar el pensamiento crítico y la contraargumentación.
     """
-    def __init__(self, factory, prompt_validador, prompt_orientador):
+    def __init__(self, factory, prompt_validador, prompt_orientador, window_size: int = 5):
         super().__init__(timeout=15)
         # Agentes específicos de este pipeline
         self.agenteValidador = factory.create_agent("Validador", prompt_validador)
         self.agenteOrientador = factory.create_agent("Orientador", prompt_orientador)
         self.agentes = [self.agenteValidador, self.agenteOrientador]
+        # Ventanas de mensajes: buffer deslizante con tamaño configurable.
+        # Cuando el buffer alcanza `window_size` se dispara `evento_ventana`
+        self.window_size = window_size
+        self._window_buffer = []
+        # Callback para notificar al intermediario cuando se dispara la ventana
+        self._on_window_event_callback = None
 
     async def start_session(self, tema_sala: str, usuarios_sala: list, idioma: str):
         await self.set_hub(tema_sala, usuarios_sala, idioma)
@@ -33,8 +39,57 @@ class AbogadoPipeline(BasePipeline):
         return [{"agente": "Orientador", "respuesta": self.ensure_text(self.extract_content(res))}]
 
     async def entrar_mensaje_a_la_sala(self, username: str, mensaje: str):
+        """
+        Flujo de mensaje: difunde el mensaje y lo añade a la ventana.
+        La evaluación/intervención ocurre solo cuando la ventana se llena,
+        no por cada mensaje individual.
+        """
         msg = Msg(name=sanitize_name(username), role='user', content=mensaje)
-        return await self.evaluar_intervencion_en_cascada(msg)
+        await self._broadcast(msg)
+        
+        # Añadir a la ventana y disparar evento si se completa
+        await self._add_to_window(msg)
+        
+        # Devolver confirmación vacía: la evaluación ocurre internamente en _add_to_window
+        return []
+
+    async def _add_to_window(self, msg: Msg):
+        """
+        Añade un mensaje al buffer de la ventana y dispara `evento_ventana`
+        cuando se alcanza `self.window_size`.
+        El buffer funciona de forma deslizante (pop por la izquierda).
+        """
+        self._window_buffer.append(msg)
+        # Mantener tamaño deslizante
+        if len(self._window_buffer) > self.window_size:
+            self._window_buffer.pop(0)
+
+        # Disparar evento cuando se alcanza exactamente el tamaño de ventana
+        if len(self._window_buffer) == self.window_size:
+            try:
+                logger.info(f"[Ventana completa] Se disparó evento_ventana con {self.window_size} mensajes")
+                # Construir un mensaje-síntesis indicando que la ventana se completó
+                contenido = (
+                    f"Se ha alcanzado una ventana de {self.window_size} mensajes. "
+                    "Por favor, el agente Validador evalúe si es necesario intervenir.\n"
+                    "Últimos mensajes:\n"
+                )
+                for m in self._window_buffer:
+                    contenido += f"- {getattr(m, 'name', 'anon')} : {str(m.content)}\n"
+
+                msg_ventana = Msg(name="host", role="system", content=contenido)
+                # Ejecutar la evaluación de ventana (cascada) - devuelve respuestas de agentes
+                respuestas = await self.evaluar_intervencion_en_cascada(msg_ventana)
+                logger.info(f"[Ventana] Respuestas obtenidas: {len(respuestas)} agentes respondieron")
+                
+                # Notificar al intermediario si hay un callback
+                if self._on_window_event_callback:
+                    await self._on_window_event_callback(respuestas)
+                
+                # Limpiar la ventana después de procesar
+                self._window_buffer.clear()
+            except Exception as e:
+                logger.exception(f"Error al procesar evento de ventana: {e}")
 
     async def evaluar_intervencion_en_cascada(self, mensaje: Msg):
         await self._broadcast(mensaje)

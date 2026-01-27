@@ -12,11 +12,23 @@ class IntermediarioAbogado(BaseIntermediario):
         super().__init__(sio, sala, room_session_id)
         
         # Los prompts deben venir de la BD con claves específicas del sistema "abogado-del-diablo"
+        window_size = config_multiagente.ventana_mensajes if config_multiagente else 5
         self.pipeLine = AbogadoPipeline(
             factory=ReActAgentFactory(),
             prompt_validador=prompts.get("Validador"),
-            prompt_orientador=prompts.get("Orientador")
+            prompt_orientador=prompts.get("Orientador"),
+            window_size=window_size
         )
+        # Registrar callback para eventos de ventana
+        self.pipeLine._on_window_event_callback = self._manejar_evento_ventana
+
+    async def _manejar_evento_ventana(self, respuestas: list):
+        """Maneja las respuestas cuando se dispara un evento de ventana."""
+        if respuestas:
+            for r in respuestas:
+                self._insert_in_db(r["agente"], r["respuesta"])
+            # Emitir las respuestas al frontend
+            await self.sio.emit("evaluacion", respuestas, room=self.sala)
 
     async def agregarMensage(self, userName, message, user_message_id):
         self.hubo_mensaje_desde_ultimo_callback = True
