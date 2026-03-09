@@ -27,6 +27,8 @@ class AbogadoPipeline(BasePipeline):
         self._window_buffer = []
         # Callback para notificar al intermediario cuando se dispara la ventana
         self._on_window_event_callback = None
+        # Callback para ver el cooldown
+        self.check_cooldown_callback = None
 
     async def start_session(self, tema_sala: str, usuarios_sala: list, idioma: str):
         await self.set_hub(tema_sala, usuarios_sala, idioma)
@@ -66,6 +68,12 @@ class AbogadoPipeline(BasePipeline):
 
         # Disparar evento cuando se alcanza exactamente el tamaño de ventana
         if len(self._window_buffer) == self.window_size:
+            if self.check_cooldown_callback and not self.check_cooldown_callback():
+                print("EStoy en cooldown!!!!!!!!!!!")
+                # Si hay cooldown, NO evaluamos y NO vaciamos el buffer.
+                # Así, el próximo mensaje que llegue volverá a intentar disparar la ventana.
+                logger.info("[Ventana] Evaluación pospuesta por Cooldown activo.")
+                return
             try:
                 logger.info(f"[Ventana completa] Se disparó evento_ventana con {self.window_size} mensajes")
                 # Construir un mensaje-síntesis indicando que la ventana se completó
