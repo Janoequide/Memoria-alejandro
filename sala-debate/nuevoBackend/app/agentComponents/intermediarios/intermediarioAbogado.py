@@ -20,6 +20,8 @@ class IntermediarioAbogado(BaseIntermediario):
             prompt_orientador=prompts.get("Orientador"),
             window_size=window_size
         )
+        # salvar nombre de sala en pipeline para exportaciones
+        self.pipeLine.sala_name = sala
         # Sincronizamos el Pipeline con el estado del Intermediario
         self.pipeLine._on_window_event_callback = self._manejar_evento_ventana
         self.pipeLine.check_cooldown_callback = self.puede_intervenir # Nueva función de chequeo

@@ -26,17 +26,26 @@ class StandardPipeline(BasePipeline):
 
     async def entrar_mensaje_a_la_sala(self, username: str, mensaje: str):
         msg = Msg(name=sanitize_name(username), role='user', content=mensaje)
+        # difundir el mensaje de usuario en el hub para que quede en el log
+        await self._broadcast(msg)
         return await self.evaluar_intervencion_en_cascada(msg)
 
     async def evaluar_intervencion_en_cascada(self, mensaje: Msg):
         await self._broadcast(mensaje)
+        # solicitar evaluación al Validador y difundir su mensaje para que quede en el historial
         res_val = await self._call_agent(self.agenteValidador, mensaje)
+        if not isinstance(res_val, Msg):
+            res_val = Msg(name=self.agenteValidador.name, role="assistant", content=self.ensure_text(res_val))
+        await self._broadcast(res_val)
         texto_val = self.ensure_text(self.extract_content(res_val))
         
         respuestas = [{"agente": "Validador", "respuesta": texto_val}]
         
         if filter_agents(texto_val, self.agentes):
             res_ori = await self._call_agent(self.agenteOrientador)
+            if not isinstance(res_ori, Msg):
+                res_ori = Msg(name=self.agenteOrientador.name, role="assistant", content=self.ensure_text(res_ori))
+            await self._broadcast(res_ori)
             respuestas.append({"agente": "Orientador", "respuesta": self.ensure_text(self.extract_content(res_ori))})
             
         return respuestas

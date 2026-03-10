@@ -27,20 +27,31 @@ class QualityPipeline(BasePipeline):
 
     async def entrar_mensaje_a_la_sala(self, username: str, mensaje: str):
         msg = Msg(name=sanitize_name(username), role='user', content=mensaje)
+        await self._broadcast(msg)  # guardar en historial
         # Toulmin envía el mensaje al Validador directamente
         res = await self._call_agent(self.agenteValidador, msg)
+        if not isinstance(res, Msg):
+            res = Msg(name=self.agenteValidador.name, role="assistant", content=self.ensure_text(res))
+        await self._broadcast(res)
         return self.ensure_text(self.extract_content(res))
 
     async def evaluar_intervencion_en_cascada(self):
         # Lógica de Curador -> Orientador
         msg_curador = Msg(name="Host", role="system", content="Evalúa si se necesita intervención.")
+        await self._broadcast(msg_curador)
         res_curador = await self._call_agent(self.agenteCurador, msg_curador)
+        if not isinstance(res_curador, Msg):
+            res_curador = Msg(name=self.agenteCurador.name, role="assistant", content=self.ensure_text(res_curador))
+        await self._broadcast(res_curador)
         texto_curador = self.ensure_text(self.extract_content(res_curador))
         
         respuestas = [{"agente": "Curador", "respuesta": texto_curador}]
         
         if filter_agents(texto_curador, self.agentes): # Si decide que sigue el Orientador
             res_ori = await self._call_agent(self.agenteOrientador)
+            if not isinstance(res_ori, Msg):
+                res_ori = Msg(name=self.agenteOrientador.name, role="assistant", content=self.ensure_text(res_ori))
+            await self._broadcast(res_ori)
             respuestas.append({"agente": "Orientador", "respuesta": self.ensure_text(self.extract_content(res_ori))})
         
         return respuestas

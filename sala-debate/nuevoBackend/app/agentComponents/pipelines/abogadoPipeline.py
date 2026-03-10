@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from .base_pipeline import BasePipeline
 from ..utils.utilsForAgents import *
 from agentscope.message import Msg
@@ -46,6 +47,7 @@ class AbogadoPipeline(BasePipeline):
         La evaluación/intervención ocurre solo cuando la ventana se llena,
         no por cada mensaje individual.
         """
+
         msg = Msg(name=sanitize_name(username), role='user', content=mensaje)
         await self._broadcast(msg)
         
@@ -102,12 +104,18 @@ class AbogadoPipeline(BasePipeline):
     async def evaluar_intervencion_en_cascada(self, mensaje: Msg):
         await self._broadcast(mensaje)
         res_val = await self._call_agent(self.agenteValidador, mensaje)
+        if not isinstance(res_val, Msg):
+            res_val = Msg(name=self.agenteValidador.name, role="assistant", content=self.ensure_text(res_val))
+        await self._broadcast(res_val)
         texto_val = self.ensure_text(self.extract_content(res_val))
         
         respuestas = [{"agente": "Validador", "respuesta": texto_val}]
         
         if filter_agents(texto_val, self.agentes):
             res_ori = await self._call_agent(self.agenteOrientador)
+            if not isinstance(res_ori, Msg):
+                res_ori = Msg(name=self.agenteOrientador.name, role="assistant", content=self.ensure_text(res_ori))
+            await self._broadcast(res_ori)
             respuestas.append({"agente": "Orientador", "respuesta": self.ensure_text(self.extract_content(res_ori))})
             
         return respuestas

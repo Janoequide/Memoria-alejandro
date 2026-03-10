@@ -122,10 +122,6 @@ def register_sockets(socketio,salas_activas):
 
     @socketio.on('message')
     def handle_message(data):
-        """
-        Maneja un mensaje entrante de un usuario, lo envía al pipeline
-        y emite la evaluación resultante.
-        """
         room = data['room']
         username = data['username']
         content = data['content']
