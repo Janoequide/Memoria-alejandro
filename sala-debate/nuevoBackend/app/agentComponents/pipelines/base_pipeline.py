@@ -67,7 +67,21 @@ class BasePipeline(ABC):
             ts = datetime.now().isoformat()
         autor = getattr(msg, "name", "Desconocido")
         contenido = str(msg.content)
-        self._user_history.append({"timestamp": ts, "autor": autor, "contenido": contenido})
+        # deducir si el emisor es un agente (cualquier rol distinto de 'user')
+        role = getattr(msg, "role", "")
+        is_agent = role.lower() != "user"
+        # build basic message entry; pipeline and caso move to header later
+        entry = {
+            "timestamp": ts,
+            "agent": is_agent,
+            "autor": autor,
+        }
+        # host tiene formato especial con lista de líneas
+        if autor.lower() == "host":
+            entry["ultimos_mensajes"] = contenido.splitlines()
+        else:
+            entry["contenido"] = contenido
+        self._user_history.append(entry)
         try:
             if not self.hub: return False
             async with self._lock_broadcast:
@@ -217,35 +231,40 @@ class BasePipeline(ABC):
         if not self.hub:
             raise RuntimeError("No hay sesión activa para exportar.")
 
+        #  'caso' reemplaza al antiguo campo 'tema' y sirve de descripción
         registro = {
-            "tema": getattr(self, "tema_sala", ""),
             "sala": self.sala_name or "",  # nombre de la sala si se conoce
+            "pipeline": self.__class__.__name__,
+            "caso": getattr(self, "tema_sala", ""),
             "timestamp_exportacion": datetime.now().isoformat(),
             "mensajes": []
         }
 
-        #  Incluir los mensajes de usuario almacenados explícitamente
+        #  Preferimos la bitácora construida por _broadcast, que ya contiene
+        #  todos los campos obligatorios. Si se ha llenado, copiamos cada
+        #  registro eliminando pipeline/caso; en caso contrario, generamos
+        #  entradas análogas a partir de la historia del hub como respaldo.
         if self._user_history:
-            registro["mensajes"].extend(self._user_history)
-        #  Recuperar los mensajes históricos del hub (orden cronológico real).
-        #  Cada registro incluirá sólo timestamp, autor y contenido.
-        if hasattr(self.hub, "history"):
+            for e in self._user_history:
+                # create shallow copy without pipeline/caso/sala
+                registro["mensajes"].append({k: v for k, v in e.items() if k not in ("pipeline","caso","sala")})
+        elif hasattr(self.hub, "history"):
             for msg in self.hub.history:
                 ts = getattr(msg, "timestamp", None) or datetime.now().isoformat()
                 autor = getattr(msg, "name", "Desconocido")
                 contenido = str(msg.content)
+                role = getattr(msg, "role", "")
+                is_agent = role.lower() != "user"
+                entry = {
+                    "timestamp": ts,
+                    "agent": is_agent,
+                    "autor": autor,
+                }
                 if autor.lower() == "host":
-                    registro["mensajes"].append({
-                        "timestamp": ts,
-                        "autor": autor,
-                        "ultimos_mensajes": contenido.splitlines()
-                    })
+                    entry["ultimos_mensajes"] = contenido.splitlines()
                 else:
-                    registro["mensajes"].append({
-                        "timestamp": ts,
-                        "autor": autor,
-                        "contenido": contenido,
-                    })
+                    entry["contenido"] = contenido
+                registro["mensajes"].append(entry)
 
         #  NOTA: no incluimos la memoria interna de agentes en el log general,
         #  ya que sólo nos interesa la secuencia real de la conversación.
