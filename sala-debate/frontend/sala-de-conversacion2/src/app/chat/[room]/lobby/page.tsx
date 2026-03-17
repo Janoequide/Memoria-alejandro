@@ -47,7 +47,7 @@ export default function LobbyPage() {
     return () => {
       socket.disconnect()
     }
-  }, [room])
+  }, [room, backend, router])
 
   const joinLobby = () => {
     if (!username.trim() || !socketRef.current) return
@@ -81,8 +81,9 @@ export default function LobbyPage() {
       const res = await fetch(`${backend}/api/rooms/${room}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ room, prompt_inicial: prompt,idioma,pipeline_type: pipelineType }),
+        body: JSON.stringify({ room, prompt_inicial: prompt, idioma, pipeline_type: pipelineType }),
       })
+      
       if (!res.ok) {
         const err = await res.json().catch(()=>({}))
         console.error('Error init-topic', err)
@@ -99,74 +100,83 @@ export default function LobbyPage() {
     }
   }
 
-    return (
-      <main className="flex justify-center items-center min-h-screen pt-12">
-        <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-2xl border border-gray-200 my-8 max-h-[calc(100vh-4rem)] overflow-auto">
-          <h1 className="text-2xl font-bold mb-6 text-center text-blue-800">
-            Lobby — Sala: {room}
-          </h1>
+  return (
+    <main className="flex justify-center items-center min-h-screen pt-12">
+      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-2xl border border-gray-200 my-8 max-h-[calc(100vh-4rem)] overflow-auto">
+        <h1 className="text-2xl font-bold mb-6 text-center text-blue-800">
+          Lobby — Sala: {room}
+        </h1>
 
-          {!joined ? (
-            <div className="flex flex-col gap-3">
-              <label className="font-medium text-gray-700">
-                Nombre de usuario:
-              </label>
-              <input
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Tu nombre"
-                className="border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none"
-              />
-              <button
-                onClick={joinAndStart}
-                disabled={!username.trim() || starting}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
-              >
-                {starting ? 'Entrando...' : 'Entrar a la sala'}
-              </button>
+        {!joined ? (
+          <div className="flex flex-col gap-3">
+            <label className="font-medium text-gray-700">
+              Nombre de usuario:
+            </label>
+            <input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Tu nombre"
+              className="border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none"
+            />
+            <button
+              onClick={joinAndStart}
+              disabled={!username.trim() || starting}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {starting ? 'Entrando...' : 'Entrar a la sala'}
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* NUEVO: Indicador de carga cuando se está iniciando la sala */}
+            {starting && (
+              <div className="mb-6 p-4 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg flex items-center gap-3 shadow-sm">
+                <svg className="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span className="font-medium">Estás entrando a la sala, espera un momento...</span>
+              </div>
+            )}
+
+            <div className="mb-6">
+              <strong className="block text-gray-700 mb-2">Participantes:</strong>
+              <ul className="mt-2 list-disc list-inside bg-gray-50 border rounded-md p-3 max-h-40 overflow-y-auto text-gray-700">
+                {participants.length === 0 ? (
+                  <li>Esperando participantes...</li>
+                ) : (
+                  participants.map((p) => <li key={p}>{p}</li>)
+                )}
+              </ul>
+
+              <div className="mt-4 flex gap-3">
+                <button
+                  onClick={leaveLobby}
+                  disabled={starting}
+                  className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Salir del lobby
+                </button>
+              </div>
             </div>
-          ) : (
-            <>
-              <div className="mb-6">
-                <strong className="block text-gray-700 mb-2">Participantes:</strong>
-                <ul className="mt-2 list-disc list-inside bg-gray-50 border rounded-md p-3 max-h-40 overflow-y-auto text-gray-700">
-                  {participants.length === 0 ? (
-                    <li>Esperando participantes...</li>
-                  ) : (
-                    participants.map((p) => <li key={p}>{p}</li>)
-                  )}
-                </ul>
 
-                <div className="mt-4 flex gap-3">
-                  <button
-                    onClick={leaveLobby}
-                    className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition"
-                  >
-                    Salir del lobby
-                  </button>
-                </div>
+            <div>
+              <strong className="block text-gray-700 mb-2">Mensajes de sistema:</strong>
+              <div className="border rounded-md bg-gray-50 p-3 max-h-48 overflow-y-auto text-sm text-gray-700 shadow-inner">
+                {statusMessages.length === 0 ? (
+                  <p className="text-gray-400 italic">Sin mensajes aún...</p>
+                ) : (
+                  statusMessages.map((m, i) => (
+                        <div key={i} className="mb-1">
+                          • {m}
+                        </div>
+                  ))
+                )}
               </div>
-
-              <div>
-                <strong className="block text-gray-700 mb-2">Mensajes de sistema:</strong>
-                <div className="border rounded-md bg-gray-50 p-3 max-h-48 overflow-y-auto text-sm text-gray-700 shadow-inner">
-                  {statusMessages.length === 0 ? (
-                    <p className="text-gray-400 italic">Sin mensajes aún...</p>
-                  ) : (
-                    statusMessages.map((m, i) => (
-                      <div key={i} className="mb-1">
-                        • {m}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </main>
-
-
-    
+            </div>
+          </>
+        )}
+      </div>
+    </main>
   )
 }

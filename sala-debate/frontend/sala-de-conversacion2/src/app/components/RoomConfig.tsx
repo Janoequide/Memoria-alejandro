@@ -145,32 +145,48 @@ export default function RoomConfig({ backend }: RoomConfigProps) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {/* Panel izquierdo - Estado de salas */}
-      <div className="border rounded-lg p-4 shadow bg-gray-50">
-        <h2 className="text-lg font-semibold mb-2">Estado de salas</h2>
+      {/* Panel izquierdo - Estado de salas (Diseño flexible sin scroll horizontal) */}
+      <div className="border rounded-lg p-4 shadow bg-gray-50 flex flex-col h-full max-h-[700px] overflow-x-hidden overflow-y-auto">
+        <h2 className="text-lg font-semibold mb-4 sticky top-0 bg-gray-50 pb-2 z-10 border-b">Estado de salas</h2>
         {roomStatuses.length === 0 ? (
           <p className="text-sm text-gray-500">No hay información de salas.</p>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-3">
             {roomStatuses.map((r, idx) => (
-              <li key={idx} className="flex justify-between items-center border-b pb-1">
-                <span>{r.room_name}</span>
-                <span
-                  className={`px-2 py-1 rounded text-xs font-semibold ${
-                    r.status === 'active'
-                      ? 'bg-green-200 text-green-800'
-                      : 'bg-red-200 text-red-800'
-                  }`}
-                >
-                  {r.status || 'sin sesión'}
-                </span>
-                {r.status === 'active' && (
-                  <button
-                    className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded hover:bg-red-600 transition"
-                    onClick={() => handleCloseRoom(r.room_name)}
+              <li key={idx} className="flex justify-between items-center border-b border-gray-200 pb-3 gap-2">
+                
+                {/* Textos: Nombre de la sala y estado */}
+                <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                  <span className="font-medium text-gray-800 text-sm leading-snug break-words">
+                    {r.room_name}
+                  </span>
+                  <span
+                    className={`w-fit px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${
+                      r.status === 'active'
+                        ? 'bg-green-200 text-green-800'
+                        : 'bg-red-200 text-red-800'
+                    }`}
                   >
-                    Cerrar
-                  </button>
+                    {r.status || 'sin sesión'}
+                  </span>
+                </div>
+                
+                {/* Botones Apilados verticalmente */}
+                {r.status === 'active' && (
+                  <div className="flex flex-col gap-1.5 shrink-0">
+                    <button
+                      className="bg-blue-600 text-white text-[10px] font-medium px-2 py-1.5 rounded hover:bg-blue-700 transition shadow-sm w-full text-center"
+                      onClick={() => router.push(`/chat/${r.room_name}/lobby`)}
+                    >
+                      Unirse
+                    </button>
+                    <button
+                      className="bg-red-500 text-white text-[10px] font-medium px-2 py-1.5 rounded hover:bg-red-600 transition shadow-sm w-full text-center"
+                      onClick={() => handleCloseRoom(r.room_name)}
+                    >
+                      Cerrar
+                    </button>
+                  </div>
                 )}
               </li>
             ))}
@@ -226,7 +242,7 @@ export default function RoomConfig({ backend }: RoomConfigProps) {
           </select>
         </div>
 
-        {/* --- MODIFICADO: Selector de sistema dinámico --- */}
+        {/* --- Selector de sistema dinámico --- */}
         <div className="mb-6">
           <label className="block mb-2 text-sm font-medium">Seleccionar tipo de sistema:</label>
           <select
@@ -249,9 +265,9 @@ export default function RoomConfig({ backend }: RoomConfigProps) {
           <button
             onClick={handleEnter}
             disabled={!room || !topic || availablePipelines.length === 0}
-            className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 transition w-full disabled:bg-gray-400"
+            className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 transition w-full disabled:bg-gray-400 font-medium shadow-md"
           >
-            Entrar a la Sala
+            Crear y Entrar a la Sala
           </button>
         </div>
 
