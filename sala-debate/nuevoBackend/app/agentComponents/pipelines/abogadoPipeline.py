@@ -16,9 +16,8 @@ class AbogadoPipeline(BasePipeline):
     La diferencia principal está en los prompts que recibe de la BD,
     que deben estar diseñados para fomentar el pensamiento crítico y la contraargumentación.
     """
-
-    INACTIVITY_THRESHOLD_SECONDS = 60
-    INACTIVITY_MENTION_COOLDOWN_SECONDS = 75
+    INACTIVITY_THRESHOLD_SECONDS = 60 # Definir a un usuario como inactivo
+    INACTIVITY_MENTION_COOLDOWN_SECONDS = 75 #Si fue mencionado como inactivo, en "x" segundos se volverá a contar como inactivo
     INACTIVITY_MIN_RELATIVE_PARTICIPATION = 0.0
 
     def __init__(self, factory, prompt_validador, prompt_orientador, window_size: int = 5):
