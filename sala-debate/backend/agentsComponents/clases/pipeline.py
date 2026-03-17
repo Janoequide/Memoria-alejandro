@@ -98,8 +98,14 @@ class Pipeline:
         except Exception as e:
             print(f"[Error de validación en start_session]: {e}")
 
-        await self.hub.broadcast(respuesta_validador) 
-        respuesta_orientador = await self.agenteOrientador(mensaje) 
+        # garantizar que sea Msg antes de enviar
+        if not isinstance(respuesta_validador, Msg):
+            respuesta_validador = Msg(name=self.agenteValidador.name, role="assistant", content=self.ensure_text(respuesta_validador))
+        await self._broadcast(respuesta_validador)
+        respuesta_orientador = await self.agenteOrientador(mensaje)
+        if not isinstance(respuesta_orientador, Msg):
+            respuesta_orientador = Msg(name=self.agenteOrientador.name, role="assistant", content=self.ensure_text(respuesta_orientador))
+        await self._broadcast(respuesta_orientador)
         return [{
             "agente":"Orientador",
             "respuesta":respuesta_orientador.content
@@ -149,20 +155,23 @@ class Pipeline:
 
     async def entrar_mensaje_a_la_sala(self,username:str,mensaje:str):
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        contenido_json = json.dumps({"contenido": mensaje}, ensure_ascii=False)
+        # registrar en historial propio
+        ts = datetime.now().isoformat()
+        self._user_history.append({"timestamp": ts, "autor": username, "contenido": mensaje})
         username_sanitized = sanitize_name(username)
-        mensaje_formateado = (
-        f" Mensaje enviado por {username} a las {now}:\n"
-        f'{{"contenido": "{mensaje}"}}'
-        )
-
         msg = Msg(name=username_sanitized,
                   role='user',
-                  content=mensaje_formateado)
+                  content=mensaje)
         
-        await self.hub.broadcast(msg)
+        await self._broadcast(msg)
         respuesta_validador = await self.agenteValidador(msg)
-        await self.hub.broadcast(respuesta_validador)
+        if not isinstance(respuesta_validador, Msg):
+            respuesta_validador = Msg(
+                name=self.agenteValidador.name,
+                role="assistant",
+                content=self.ensure_text(respuesta_validador)
+            )
+        await self._broadcast(respuesta_validador)
         return respuesta_validador.content
 
     
@@ -201,7 +210,7 @@ class Pipeline:
         )
         print("AVISO TIMER ENVIADO AL HUB")
         try:
-            await self.hub.broadcast(msg_tiempo)
+            await self._broadcast(msg_tiempo)
         except Exception as e:
             print(f"[Pipeline] Error broadcast msg_tiempo: {e}")
         return None
@@ -209,7 +218,7 @@ class Pipeline:
 
     
     async def evaluar_intervencion_en_cascada(self,mensaje:Msg):
-        await self.hub.broadcast(mensaje)
+        await self._broadcast(mensaje)
         print("se llama al curador PIPELINE")
         curador_msg = await self.agenteCurador(mensaje)
         print("respuesta del curador obtenida")
@@ -239,7 +248,7 @@ class Pipeline:
         msgUsuario = Msg(name=nombre_limpio,
                          role="user",
                          content=mensaje)
-        await self.hub.broadcast(msgUsuario)
+        await self._broadcast(msgUsuario)
         respuesta = await self.agenteOrientador()
         await self.agenteValidador.observe(respuesta)
         return [{
@@ -341,7 +350,7 @@ class Pipeline:
 
         try:
             # Broadcast del contexto temporal
-            await self.hub.broadcast(msg_hito)
+            await self._broadcast(msg_hito)
             
             # Solicitar respuesta del Orientador
             respuesta_orientador = await self.agenteOrientador(msg_hito)
@@ -431,29 +440,21 @@ class Pipeline:
             "mensajes": []
         }
 
-        #  Recuperar los mensajes históricos del hub (orden cronológico real)
+        #  Añadir mensajes de usuario guardados manualmente
+        if self._user_history:
+            registro["mensajes"].extend(self._user_history)
+        #  Recuperar los mensajes históricos del hub (orden cronológico real).
         if hasattr(self.hub, "history"):
             for msg in self.hub.history:
+                ts = getattr(msg, "timestamp", None) or datetime.now().isoformat()
+                autor = getattr(msg, "name", "Desconocido")
                 registro["mensajes"].append({
-                    "timestamp": getattr(msg, "timestamp", None),
-                    "autor": getattr(msg, "name", "Desconocido"),
-                    "rol": getattr(msg, "role", "unknown"),
+                    "timestamp": ts,
+                    "autor": autor,
                     "contenido": str(msg.content),
-                    "tipo": "hub_message"
                 })
 
-        #  Agregar la memoria interna de los agentes
-        memoria = await self.show_memory()
-        for agente, mensajes in memoria.items():
-            for idx, msg_texto in enumerate(mensajes, start=1):
-                registro["mensajes"].append({
-                    "timestamp": None,
-                    "autor": agente,
-                    "rol": "agent_memory",
-                    "contenido": msg_texto,
-                    "tipo": "memoria_agente",
-                    "orden_memoria": idx
-                })
+        #  No se incluyen entradas de memoria interna en el log general.
 
         #  Ordenar por timestamp si existe
         registro["mensajes"].sort(key=lambda m: m.get("timestamp") or "", reverse=False)

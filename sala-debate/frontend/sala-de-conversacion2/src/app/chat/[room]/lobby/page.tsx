@@ -56,6 +56,12 @@ export default function LobbyPage() {
     sessionStorage.setItem('chatUser', JSON.stringify({ room, username }))
   }
 
+  const joinAndStart = async () => {
+    if (!username.trim()) return
+    joinLobby()
+    await startRoom()
+  }
+
   const leaveLobby = () => {
     if (!socketRef.current || !username) return
     socketRef.current.emit('leave', { room, username })
@@ -103,7 +109,7 @@ export default function LobbyPage() {
           {!joined ? (
             <div className="flex flex-col gap-3">
               <label className="font-medium text-gray-700">
-                Nombre de usuario (lobby):
+                Nombre de usuario:
               </label>
               <input
                 value={username}
@@ -112,11 +118,11 @@ export default function LobbyPage() {
                 className="border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none"
               />
               <button
-                onClick={joinLobby}
-                disabled={!username.trim()}
-                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+                onClick={joinAndStart}
+                disabled={!username.trim() || starting}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
               >
-                Unirse al lobby
+                {starting ? 'Entrando...' : 'Entrar a la sala'}
               </button>
             </div>
           ) : (
@@ -132,13 +138,6 @@ export default function LobbyPage() {
                 </ul>
 
                 <div className="mt-4 flex gap-3">
-                  <button
-                    onClick={startRoom}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
-                    disabled={starting}
-                  >
-                    {starting ? 'Iniciando...' : 'Empezar sala'}
-                  </button>
                   <button
                     onClick={leaveLobby}
                     className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition"

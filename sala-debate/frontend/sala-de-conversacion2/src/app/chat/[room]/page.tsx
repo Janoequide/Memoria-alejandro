@@ -84,7 +84,7 @@ useEffect(() => {
       data.forEach((m) => {
         if (m.agente) {
           // Curador -> panel de agentes
-          if (m.agente.toLowerCase() === 'curador') {
+          if (m.agente.toLowerCase() === 'curador' || m.agente.toLowerCase() === 'validador') {
             agentMsgs.push({ username: m.agente, content: m.content });
           } else {
             // Orientador -> chat normal
@@ -141,7 +141,7 @@ useEffect(() => {
           setMessages((prev) => [...prev, { username: agente, content: respuesta }]);
         } 
         // curador -> va al panel de agentes
-        else if (agente.toLowerCase() === "curador") {
+        else if (agente.toLowerCase() === "curador" || agente.toLowerCase() === "validador") {
           setAgentMessages((prev) => [...prev, { username: agente, content: respuesta }]);
         }
         else if (agente.toLowerCase() === "resumidor") {

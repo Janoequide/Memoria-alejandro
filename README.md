@@ -3,8 +3,9 @@ Titulo-Trabajo
 
 # Instrucciones de uso
 - Front: 
-    - `cd sala-debate\frontend\sala-de-conversacion2; npm i; npm run dev`
+    - rápido: `cd sala-debate\frontend\sala-de-conversacion2; npm i; npm run dev`
 - NuevoBack: 
+    - rápido: `cd sala-debate\nuevoBackend; app/.venv\Scripts\activate; uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
     - Crear .env usando el .env.example
     - `cd sala-debate\nuevoBackend`
     - crear entorno .venv con python3
@@ -14,7 +15,7 @@ Titulo-Trabajo
     - crear la bd
         - `psql -U postgres -f .\db.sql`
     - `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
-    - `cd sala-debate\nuevoBackend; app/.venv\Scripts\activate; uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
+    
 - online:
     - start nginx
-    - `ngrok http 80 --host-header="localhost"`
+    - `start nginx; ngrok http 80 --host-header="localhost"`

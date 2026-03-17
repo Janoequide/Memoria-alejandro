@@ -20,6 +20,9 @@ class BasePipeline(ABC):
         self.hub = None
         self.agentes = []
         self.tema_sala = None
+        self.sala_name: str | None = None  # nombre de la sala para los logs
+        # registro manual de mensajes de usuario para logging
+        self._user_history: list[dict] = []
     
     # Hacer disponible formato_tiempo como método
     def formato_tiempo(self, segundos: int) -> str:
@@ -52,8 +55,35 @@ class BasePipeline(ABC):
             return False
 
     async def _broadcast(self, msg: Msg) -> bool:
-        if not self.hub: return False
+        """Envía un mensaje al hub y lo registra en el historial local.
+        Esto permite que tanto los mensajes de usuario como los de los agentes
+        queden disponibles para la exportación incluso si hub.history está vacío.
+        """
+        # guardar en historial de conversación
         try:
+            ts = getattr(msg, "timestamp", None) or datetime.now().isoformat()
+        except NameError:
+            from datetime import datetime
+            ts = datetime.now().isoformat()
+        autor = getattr(msg, "name", "Desconocido")
+        contenido = str(msg.content)
+        # deducir si el emisor es un agente (cualquier rol distinto de 'user')
+        role = getattr(msg, "role", "")
+        is_agent = role.lower() != "user"
+        # build basic message entry; pipeline and caso move to header later
+        entry = {
+            "timestamp": ts,
+            "agent": is_agent,
+            "autor": autor,
+        }
+        # host tiene formato especial con lista de líneas
+        if autor.lower() == "host":
+            entry["ultimos_mensajes"] = contenido.splitlines()
+        else:
+            entry["contenido"] = contenido
+        self._user_history.append(entry)
+        try:
+            if not self.hub: return False
             async with self._lock_broadcast:
                 await self.hub.broadcast(msg)
             return True
@@ -111,9 +141,18 @@ class BasePipeline(ABC):
         await self._broadcast(msg_usuario)
         
         agente = next((a for a in self.agentes if a.name == agent_name), None)
-        if not agente: return []
+        if not agente:
+            return []
 
         respuesta = await self._call_agent(agente, msg_usuario)
+        # asegurar que la respuesta sea un Msg para mantener el rastreo en el hub
+        if not isinstance(respuesta, Msg):
+            respuesta = Msg(
+                name=agente.name,
+                role="assistant",
+                content=self.ensure_text(respuesta)
+            )
+        await self._broadcast(respuesta)
         return [{
             "agente": agent_name,
             "respuesta": self.ensure_text(self.extract_content(respuesta))
@@ -169,7 +208,10 @@ class BasePipeline(ABC):
             for idx, msg in enumerate(mensajes_historial, start=1):
                 timestamp = getattr(msg, "timestamp", "")
                 role = getattr(msg, "role", "unknown")
-                author = getattr(msg, "author", agente.name)
+                # Prioritize an explicit 'author' attribute, otherwise fall back to 'name'
+                # (la mayoría de mensajes usa 'name' para el emisor). Si ninguno existe,
+                # asumimos que fue el propio agente para evitar registros erróneos.
+                author = getattr(msg, "author", None) or getattr(msg, "name", agente.name)
                 content = serialize_msg_content(msg)
                 memoria_agente.append(
                     f"--- Mensaje {idx} ---\n"
@@ -189,35 +231,43 @@ class BasePipeline(ABC):
         if not self.hub:
             raise RuntimeError("No hay sesión activa para exportar.")
 
+        #  'caso' reemplaza al antiguo campo 'tema' y sirve de descripción
         registro = {
-            "tema": getattr(self, "tema_sala", ""),
+            "sala": self.sala_name or "",  # nombre de la sala si se conoce
+            "pipeline": self.__class__.__name__,
+            "caso": getattr(self, "tema_sala", ""),
             "timestamp_exportacion": datetime.now().isoformat(),
             "mensajes": []
         }
 
-        #  Recuperar los mensajes históricos del hub (orden cronológico real)
-        if hasattr(self.hub, "history"):
+        #  Preferimos la bitácora construida por _broadcast, que ya contiene
+        #  todos los campos obligatorios. Si se ha llenado, copiamos cada
+        #  registro eliminando pipeline/caso; en caso contrario, generamos
+        #  entradas análogas a partir de la historia del hub como respaldo.
+        if self._user_history:
+            for e in self._user_history:
+                # create shallow copy without pipeline/caso/sala
+                registro["mensajes"].append({k: v for k, v in e.items() if k not in ("pipeline","caso","sala")})
+        elif hasattr(self.hub, "history"):
             for msg in self.hub.history:
-                registro["mensajes"].append({
-                    "timestamp": getattr(msg, "timestamp", None),
-                    "autor": getattr(msg, "name", "Desconocido"),
-                    "rol": getattr(msg, "role", "unknown"),
-                    "contenido": str(msg.content),
-                    "tipo": "hub_message"
-                })
+                ts = getattr(msg, "timestamp", None) or datetime.now().isoformat()
+                autor = getattr(msg, "name", "Desconocido")
+                contenido = str(msg.content)
+                role = getattr(msg, "role", "")
+                is_agent = role.lower() != "user"
+                entry = {
+                    "timestamp": ts,
+                    "agent": is_agent,
+                    "autor": autor,
+                }
+                if autor.lower() == "host":
+                    entry["ultimos_mensajes"] = contenido.splitlines()
+                else:
+                    entry["contenido"] = contenido
+                registro["mensajes"].append(entry)
 
-        #  Agregar la memoria interna de los agentes
-        memoria = await self.show_memory()
-        for agente, mensajes in memoria.items():
-            for idx, msg_texto in enumerate(mensajes, start=1):
-                registro["mensajes"].append({
-                    "timestamp": None,
-                    "autor": agente,
-                    "rol": "agent_memory",
-                    "contenido": msg_texto,
-                    "tipo": "memoria_agente",
-                    "orden_memoria": idx
-                })
+        #  NOTA: no incluimos la memoria interna de agentes en el log general,
+        #  ya que sólo nos interesa la secuencia real de la conversación.
 
         #  Ordenar por timestamp si existe
         registro["mensajes"].sort(key=lambda m: m.get("timestamp") or "", reverse=False)

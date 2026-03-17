@@ -10,6 +10,8 @@ class IntermediarioStandard(BaseIntermediario):
             prompt_validador=prompts.get("Validador"),
             prompt_orientador=prompts.get("Orientador")
         )
+        # nombre de sala para los logs
+        self.pipeLine.sala_name = sala
 
     async def agregarMensage(self, userName, message, user_message_id):
         self.hubo_mensaje_desde_ultimo_callback = True
