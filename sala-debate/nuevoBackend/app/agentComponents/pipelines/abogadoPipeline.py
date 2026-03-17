@@ -71,7 +71,7 @@ class AbogadoPipeline(BasePipeline):
         # Disparar evento cuando se alcanza exactamente el tamaño de ventana
         if len(self._window_buffer) == self.window_size:
             if self.check_cooldown_callback and not self.check_cooldown_callback():
-                print("EStoy en cooldown!!!!!!!!!!!")
+                print("Estoy en cooldown!!!!!!!!!!!")
                 # Si hay cooldown, NO evaluamos y NO vaciamos el buffer.
                 # Así, el próximo mensaje que llegue volverá a intentar disparar la ventana.
                 logger.info("[Ventana] Evaluación pospuesta por Cooldown activo.")
@@ -136,7 +136,7 @@ class AbogadoPipeline(BasePipeline):
         3. Da recomendaciones específicas para aprovechar el tiempo {"restante" if hito < 100 else "que tuvieron"}
         4. Debes ser crítico con el avance. Si no han avanzado lo suficiente, indícaselo a los participantes.
         5. Debes indicarle en que momento de la sesión se encuentran (inicio, mitad, casi finalizado, finalización).
-        Tu mensaje debe ser conciso (máximo 3-4 oraciones) y estar en el idioma de la conversación.
+        Tu mensaje debe ser conciso (máximo 1-2 oraciones) y estar en el idioma de la conversación.
         """
 
         msg_hito = Msg(name="Host", role="system", content=instruccion)
@@ -169,6 +169,7 @@ class AbogadoPipeline(BasePipeline):
             content=(
                 "Se ha detectado inactividad. Orientador: motiva la participación con una "
                 "pregunta breve o pide profundizar un punto pendiente. No tomes postura."
+                "Tu mensaje debe ser conciso (máximo 1-2 oraciones) y estar en el idioma de la conversación."
             )
         )
         
