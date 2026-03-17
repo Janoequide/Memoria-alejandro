@@ -87,6 +87,9 @@ class QualityPipeline(BasePipeline):
                 return [{"agente": "Orientador", "respuesta": mensaje_base}]
 
             respuesta = await self._call_agent(agente_orientador, msg_hito)
+            if not isinstance(respuesta, Msg):
+                respuesta = Msg(name=self.agenteOrientador.name, role="assistant", content=self.ensure_text(respuesta))
+            await self._broadcast(respuesta)
             texto = self.ensure_text(self.extract_content(respuesta))
             
             return [{"agente": "Orientador", "respuesta": texto or mensaje_base}]
