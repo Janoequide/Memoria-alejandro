@@ -9,9 +9,8 @@ services:
     container_name: fastapi_backend # <-- Actualizado para reflejar FastAPI
     ports:
       - "8001:5000" # Expone la API en el puerto 8001 del servidor
-    environment:
-      - ORIGIN_DOMAIN=${ORIGIN_DOMAIN}
-      - DATABASE_URL=${DATABASE_URL}
+    env_file:
+      - ./nuevoBackend/app/.env
       # Si en tu código de FastAPI usas alguna variable para saber si estás en producción, ponla aquí.
     depends_on:
       - db
@@ -19,6 +18,8 @@ services:
   frontend:
     build:
       context: ./frontend/sala-de-conversacion2
+      args:
+        - NEXT_PUBLIC_BACKEND_URL=<ola>
     container_name: nextjs_frontend # <-- Actualizado a Next.js
     ports:
       - "8000:3000" # Expone el frontend en el puerto 8000 del servidor
