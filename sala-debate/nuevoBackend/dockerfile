@@ -1,0 +1,25 @@
+# Usar una imagen oficial de Python ligera
+FROM python:3.10-slim
+
+# Establecer el directorio de trabajo en el contenedor
+WORKDIR /app
+
+# Instalar dependencias del sistema (útiles para compilar paquetes como matplotlib o psycopg2)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar el archivo de requerimientos e instalarlos
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copiar todo el código de tu backend
+COPY . .
+
+# Exponer el puerto 5000 (el que mapeaste en docker-compose)
+EXPOSE 5000
+
+# Comando para ejecutar la aplicación FastAPI usando Uvicorn
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "5000"]

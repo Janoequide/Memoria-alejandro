@@ -3,35 +3,25 @@ version: '3.8'
 services:
   backend:
     build:
-      context: ./backend
+      context: ./nuevoBackend
     volumes:
-      - ./backend:/app
-    container_name: flask_backend
+      - ./nuevoBackend:/app
+    container_name: fastapi_backend # <-- Actualizado para reflejar FastAPI
     ports:
-      - "5000:5000"
+      - "8001:5000" # Expone la API en el puerto 8001 del servidor
     environment:
-      - FLASK_ENV=development
       - ORIGIN_DOMAIN=${ORIGIN_DOMAIN}
       - DATABASE_URL=${DATABASE_URL}
+      # Si en tu código de FastAPI usas alguna variable para saber si estás en producción, ponla aquí.
     depends_on:
       - db
 
   frontend:
     build:
       context: ./frontend/sala-de-conversacion2
-    container_name: react_frontend
+    container_name: nextjs_frontend # <-- Actualizado a Next.js
     ports:
-      - "3000:3000"
-
-  nginx:
-    build:
-      context: ./nginx
-    container_name: nginx_server
-    ports:
-      - "80:80"
-    depends_on:
-      - backend
-      - frontend
+      - "8000:3000" # Expone el frontend en el puerto 8000 del servidor
 
   db:
     image: postgres:15
@@ -44,7 +34,7 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data   # referencia al volumen declarado más abajo
+      - postgres_data:/var/lib/postgresql/data
 
 volumes:
-  postgres_data: {}  # <-- declarar el volumen vacío así
+  postgres_data: {}
