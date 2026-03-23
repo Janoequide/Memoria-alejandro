@@ -61,7 +61,6 @@ export default function ChatRoom() {
     .then((data) => setTema(data.tema))
   }, [room, backend])
 
-  // Hook para cargar mensajes históricos al unirse
   useEffect(() => {
     if (!joined || !username) return;
 
@@ -110,7 +109,6 @@ export default function ChatRoom() {
     fetchHistoricalMessages();
   }, [joined, room, backend, username]);
 
-  // Inicializa el socket una sola vez
   useEffect(() => {
     socketRef.current = io(backend, {
       path: '/socket.io',
@@ -254,7 +252,6 @@ export default function ChatRoom() {
       setMessages([]);
       setAgentMessages([]);
       sessionStorage.removeItem('chatUser')
-      // Redirigir al home (elegirChat)
       router.push('/elegirChat')
     }
   };
@@ -375,7 +372,8 @@ export default function ChatRoom() {
           <div
             className={`grid gap-4 flex-grow ${show_validator ? "grid-cols-1 md:grid-cols-[2fr_1fr]" : "grid-cols-1"}`}
             style={{
-              minHeight: "calc(100vh - 280px)",
+              /* AJUSTE DE ALTURA: min-height aumentado para usar el espacio azul inferior */
+              minHeight: "calc(100vh - 180px)", 
             }}
           >
             {/* Chat principal */}
@@ -430,7 +428,7 @@ export default function ChatRoom() {
               </div>
             </div>
 
-            {/* Panel del agente - Solo visible si show_validator es true */}
+            {/* Panel del agente */}
             {show_validator && (
               <div className="flex flex-col w-full h-full border rounded-lg bg-white shadow-sm overflow-hidden">
                 <div className="p-3 border-b bg-blue-50">
@@ -458,7 +456,7 @@ export default function ChatRoom() {
           </div>
 
           {/* Input de mensajes */}
-          <div className="mt-3 w-full">
+          <div className="mt-3 w-full pb-4">
             {showMentionBar && mentionTarget && (
               <div className="flex items-center gap-2 mb-2 bg-blue-50 border border-blue-300 text-blue-800 px-3 py-2 rounded-lg shadow-sm">
                 💡 Mencionando a <b>@{mentionTarget}</b>
