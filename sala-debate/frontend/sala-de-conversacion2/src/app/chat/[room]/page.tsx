@@ -254,6 +254,8 @@ export default function ChatRoom() {
       setMessages([]);
       setAgentMessages([]);
       sessionStorage.removeItem('chatUser')
+      // Redirigir al home (elegirChat)
+      router.push('/elegirChat')
     }
   };
 
