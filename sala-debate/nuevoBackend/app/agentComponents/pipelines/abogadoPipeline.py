@@ -56,7 +56,7 @@ class AbogadoPipeline(BasePipeline):
         }
 
         # Lógica de bienvenida
-        mensaje = Msg(name="Host", role="system", content="Sesión iniciada. Orientador, explica el objetivo.")
+        mensaje = Msg(name="Host", role="system", content="Sesión iniciada. Orientador, explica el objetivo y menciona la pregunta del dilema, si es que hay una.")
         await self._broadcast(mensaje)
         res = await self._call_agent(self.agenteOrientador)
 
