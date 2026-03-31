@@ -28,15 +28,8 @@ class NoIaPipeline(BasePipeline):
         # Inicializar lista de usuarios
         self.usuarios_sala = usuarios_sala or []
         
-        # Mensaje de bienvenida informativo
-        mensaje_inicio = Msg(
-            name="Host", 
-            role="system", 
-            content=f"Sesión iniciada. Tema: {tema_sala}. Los participantes conversan directamente sin asistencia de IA."
-        )
-        await self._broadcast(mensaje_inicio)
-        
-        return [{"agente": "Host", "respuesta": "Sesión sin IA iniciada. Adelante con la conversación."}]
+        # No enviar ningún mensaje - sesión completamente limpia sin rastro de IA
+        return None
 
     async def entrar_mensaje_a_la_sala(self, username: str, mensaje: str):
         """
@@ -62,45 +55,24 @@ class NoIaPipeline(BasePipeline):
 
     async def evento_timer(self):
         """
-        Evento de timer. Sin IA, solo registra un recordatorio.
+        Evento de timer. Sin IA, no envía ningún mensaje.
         """
-        recordatorio = Msg(
-            name="Host",
-            role="system",
-            content="Recordatorio: Continúen con la conversación según lo planeado."
-        )
-        await self._broadcast(recordatorio)
-        return [{"agente": "Host", "respuesta": "Recordatorio enviado."}]
+        # No enviar recordatorios - sesión completamente limpia
+        return None
 
     async def avisar_tiempo(self, elapsed_time: int, remaining_time: int):
         """
-        Aviso de tiempo transcurrido. Sin IA, solo lo registra.
+        Aviso de tiempo transcurrido. Sin IA, no envía mensajes.
         """
-        if not self.hub:
-            logger.warning("[NoIA Pipeline] Hub no disponible")
-            return None
-
-        mensaje_tiempo = Msg(
-            name="Host",
-            role="system",
-            content=f"Tiempo transcurrido: {self.formato_tiempo(elapsed_time)}. Tiempo restante: {self.formato_tiempo(remaining_time)}."
-        )
-        await self._broadcast(mensaje_tiempo)
+        # No enviar avisos de tiempo - sesión completamente limpia
+        return None
 
     async def mensaje_hito_temporal(self, hito: int, msg_base: str, elapsed_time: int, remaining_time: int):
         """
-        Procesa hitos temporales (25%, 50%, 75%, 100%). Sin IA, solo registra.
+        Procesa hitos temporales (25%, 50%, 75%, 100%). Sin IA, no envía mensajes.
         """
-        if not self.hub:
-            return None
-
-        mensaje_hito = Msg(
-            name="Host",
-            role="system",
-            content=f"[{hito}%] {msg_base} Tiempo restante: {self.formato_tiempo(remaining_time)}."
-        )
-        await self._broadcast(mensaje_hito)
-        return [{"agente": "Host", "respuesta": msg_base}]
+        # No enviar mensajes de hitos - sesión completamente limpia
+        return None
 
     async def stop_session(self) -> None:
         """

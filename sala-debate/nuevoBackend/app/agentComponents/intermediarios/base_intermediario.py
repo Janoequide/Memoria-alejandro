@@ -32,7 +32,11 @@ class BaseIntermediario(ABC):
             username, message, user_message_id = await self.message_queue.get()
             try:
                 resultado = await self.agregarMensage(username, message, user_message_id)
+                # Validar que resultado no sea "None" string ni vacío
                 if resultado:
+                    # Si es un string "None", ignorar
+                    if isinstance(resultado, str) and resultado.strip().lower() == "none":
+                        continue
                     await self.sio.emit("evaluacion", resultado, room=self.sala)
             except Exception as e:
                 logger.error(f"Error procesando mensaje en {self.sala}: {e}")
@@ -69,11 +73,18 @@ class BaseIntermediario(ABC):
         respuestas = await self.pipeLine.start_session(topic, usuarios_sala, idioma)
         
         # Iteramos sobre las respuestas para persistirlas y emitirlas
+        # Filtrar: no emitir si es None, vacío, o contiene "None" como string
         if respuestas:
-            for r in respuestas:
-                self._insert_in_db(agent_name=r["agente"], content=r["respuesta"])
+            respuestas_validas = [
+                r for r in respuestas 
+                if r.get("respuesta") and str(r.get("respuesta")).strip().lower() != "none"
+            ]
             
-            await self.sio.emit("evaluacion", respuestas, room=self.sala)
+            if respuestas_validas:
+                for r in respuestas_validas:
+                    self._insert_in_db(agent_name=r["agente"], content=r["respuesta"])
+                
+                await self.sio.emit("evaluacion", respuestas_validas, room=self.sala)
 
     # --- Callbacks y Eventos ---
     async def callback(self, elapsed_time: int, remaining_time: int, hito_alcanzado: Optional[int] = None):
@@ -94,8 +105,12 @@ class BaseIntermediario(ABC):
             if self.timer_silencio_consecutivo >= 2:
                 self.timer_silencio_consecutivo = 0
                 resultado = await self.pipeLine.evento_timer()
+                # Validar que resultado no sea "None" string ni vacío
                 if resultado:
-                    await self.sio.emit("evaluacion", resultado, room=self.sala)
+                    if isinstance(resultado, str) and resultado.strip().lower() == "none":
+                        pass  # No emitir
+                    else:
+                        await self.sio.emit("evaluacion", resultado, room=self.sala)
         except Exception as e:
             logger.error(f"[Error callback timer {self.sala}]: {e}")
 
@@ -113,9 +128,16 @@ class BaseIntermediario(ABC):
         respuestas = await self.pipeLine.mensaje_hito_temporal(hito, msg_base, elapsed_time, remaining_time)
         
         if respuestas:
-            for r in respuestas:
-                self._insert_in_db(agent_name=r["agente"], content=r["respuesta"])
-            await self.sio.emit("evaluacion", respuestas, room=self.sala)
+            # Filtrar: no emitir si es None, vacío, o contiene "None" como string
+            respuestas_validas = [
+                r for r in respuestas 
+                if r.get("respuesta") and str(r.get("respuesta")).strip().lower() != "none"
+            ]
+            
+            if respuestas_validas:
+                for r in respuestas_validas:
+                    self._insert_in_db(agent_name=r["agente"], content=r["respuesta"])
+                await self.sio.emit("evaluacion", respuestas_validas, room=self.sala)
 
     # --- Helpers ---
     def _insert_in_db(self, agent_name, content, parent_id=None, used_ids=None):
