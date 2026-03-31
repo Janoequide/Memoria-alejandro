@@ -169,6 +169,28 @@ class BasePipeline(ABC):
     def extract_content(self, raw):
         return raw.content if hasattr(raw, "content") else str(raw)
     
+    def _get_recent_user_messages(self, n: int = 5) -> list:
+        """
+        Extrae los últimos n mensajes de usuarios del historial.
+        
+        Args:
+            n: Cantidad de mensajes a extraer (default: 5)
+            
+        Returns:
+            Lista de dict con estructura {"usuario": str, "mensaje": str}
+        """
+        mensajes_evaluados = []
+        for entry in reversed(self._user_history):
+            if len(mensajes_evaluados) >= n:
+                break
+            # Solo tomar mensajes de usuarios (no agentes)
+            if not entry.get("agent", False) and entry.get("autor", "").lower() != "host":
+                mensajes_evaluados.append({
+                    "usuario": entry.get("autor", "Desconocido"),
+                    "mensaje": entry.get("contenido", "")
+                })
+        return list(reversed(mensajes_evaluados))  # Retornar en orden cronológico
+    
     async def show_memory(self) -> dict:
         """
         Retorna la memoria de los agentes como texto legible, estructurando los mensajes para análisis de un nuevo agente.

@@ -33,7 +33,14 @@ class QualityPipeline(BasePipeline):
         if not isinstance(res, Msg):
             res = Msg(name=self.agenteValidador.name, role="assistant", content=self.ensure_text(res))
         await self._broadcast(res)
-        return self.ensure_text(self.extract_content(res))
+        
+        # Extraer últimos 5 mensajes de usuario para mostrar qué evaluó el Validador
+        mensajes_evaluados = self._get_recent_user_messages(n=5)
+        
+        return {
+            "respuesta": self.ensure_text(self.extract_content(res)),
+            "mensajes_evaluados": mensajes_evaluados
+        }
 
     async def evaluar_intervencion_en_cascada(self):
         # Lógica de Curador -> Orientador
@@ -45,7 +52,14 @@ class QualityPipeline(BasePipeline):
         await self._broadcast(res_curador)
         texto_curador = self.ensure_text(self.extract_content(res_curador))
         
-        respuestas = [{"agente": "Curador", "respuesta": texto_curador}]
+        # Extraer últimos 5 mensajes de usuario para mostrar qué evaluó el Curador
+        mensajes_evaluados = self._get_recent_user_messages(n=5)
+        
+        respuestas = [{
+            "agente": "Curador", 
+            "respuesta": texto_curador,
+            "mensajes_evaluados": mensajes_evaluados
+        }]
         
         if filter_agents(texto_curador, self.agentes): # Si decide que sigue el Orientador
             res_ori = await self._call_agent(self.agenteOrientador)

@@ -14,6 +14,7 @@ export default function ChatRoom() {
   type EvaluacionData = {
     agente: string;
     respuesta: string;
+    mensajes_evaluados?: Array<{ usuario: string; mensaje: string }>;
   };
 
   const [show_validator, setShowValidator] = useState(false)
@@ -34,6 +35,7 @@ export default function ChatRoom() {
   const socketRef = useRef<Socket | null>(null)
   const [tema, setTema] = useState('')
   const [agentMessages, setAgentMessages] = useState<ChatMessage[]>([])
+  const [evaluatedMessages, setEvaluatedMessages] = useState<Record<string, Array<{ usuario: string; mensaje: string }>>>({})
   const [typingUsers,setTypingUsers] = useState<string[]>([])
   const chatContainerRef = useRef<HTMLDivElement | null>(null); 
 
@@ -128,7 +130,7 @@ export default function ChatRoom() {
     const handleEvaluacion = (data: EvaluacionData[]|EvaluacionData) => {
       const mensajes = Array.isArray(data) ? data : [data];
 
-      mensajes.forEach(({agente, respuesta}) => {
+      mensajes.forEach(({agente, respuesta, mensajes_evaluados}) => {
         if (!respuesta?.trim()) return;
     
         if (agente.toLowerCase() === "orientador") {
@@ -136,6 +138,13 @@ export default function ChatRoom() {
         } 
         else if (agente.toLowerCase() === "curador" || agente.toLowerCase() === "validador") {
           setAgentMessages((prev) => [...prev, { username: agente, content: respuesta }]);
+          // Guardar mensajes evaluados asociados a este agente
+          if (mensajes_evaluados && mensajes_evaluados.length > 0) {
+            setEvaluatedMessages((prev) => ({
+              ...prev,
+              [agente.toLowerCase()]: mensajes_evaluados
+            }));
+          }
         }
         else if (agente.toLowerCase() === "resumidor") {
           setMessages((prev) => [...prev, { username: agente, content: respuesta }]);
@@ -432,7 +441,7 @@ export default function ChatRoom() {
             {show_validator && (
               <div className="flex flex-col w-full h-full border rounded-lg bg-white shadow-sm overflow-hidden">
                 <div className="p-3 border-b bg-blue-50">
-                  <h2 className="font-semibold text-blue-700">Agente</h2>
+                  <h2 className="font-semibold text-blue-700">Agente - Debug</h2>
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-4 py-3 bg-gray-50 break-words scroll-smooth">
@@ -442,11 +451,25 @@ export default function ChatRoom() {
                     </p>
                   ) : (
                     agentMessages.map((m, i) => (
-                      <div
-                        key={i}
-                        className="p-2 rounded bg-blue-100 text-blue-800 text-sm w-full max-w-full break-words mb-2"
-                      >
-                        <b>{m.username}:</b> {m.content}
+                      <div key={i} className="mb-4 pb-3 border-b border-gray-300 last:border-b-0">
+                        {/* Respuesta del agente */}
+                        <div className="p-2 rounded bg-blue-100 text-blue-800 text-sm w-full max-w-full break-words mb-2">
+                          <b>{m.username}:</b> {m.content}
+                        </div>
+                        
+                        {/* Mensajes evaluados por este agente */}
+                        {evaluatedMessages[m.username?.toLowerCase() || '']?.length > 0 && (
+                          <div className="mt-2 pl-2 border-l-2 border-blue-300">
+                            <p className="text-xs font-semibold text-gray-600 mb-1">📋 Mensajes evaluados:</p>
+                            <div className="space-y-1">
+                              {evaluatedMessages[m.username?.toLowerCase() || ''].map((msg, idx) => (
+                                <div key={idx} className="bg-white p-1.5 rounded text-xs text-gray-700 border border-blue-200">
+                                  <b className="text-blue-700">{msg.usuario}:</b> {msg.mensaje}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))
                   )}

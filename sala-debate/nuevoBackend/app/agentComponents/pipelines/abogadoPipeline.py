@@ -152,7 +152,14 @@ class AbogadoPipeline(BasePipeline):
         await self._broadcast(res_val)
         texto_val = self.ensure_text(self.extract_content(res_val))
 
-        respuestas = [{"agente": "Validador", "respuesta": texto_val}]
+        # Extraer últimos 5 mensajes de usuario para mostrar qué evaluó el Validador
+        mensajes_evaluados = self._get_recent_user_messages(n=5)
+
+        respuestas = [{
+            "agente": "Validador", 
+            "respuesta": texto_val,
+            "mensajes_evaluados": mensajes_evaluados
+        }]
 
         if filter_agents(texto_val, self.agentes):
             res_ori = await self._call_agent(self.agenteOrientador)
@@ -164,7 +171,7 @@ class AbogadoPipeline(BasePipeline):
             respuestas.append({"agente": "Orientador", "respuesta": self.ensure_text(self.extract_content(res_ori))})
 
         return respuestas
-
+    
     def _users_inactive(self) -> list:
         ahora = datetime.now()
         inactivos = []
