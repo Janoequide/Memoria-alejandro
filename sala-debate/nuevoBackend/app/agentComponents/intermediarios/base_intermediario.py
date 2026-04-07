@@ -23,6 +23,9 @@ class BaseIntermediario(ABC):
         self.timer_silencio_consecutivo = 0
         self.hubo_mensaje_desde_ultimo_callback = False
         
+        # Nombre personalizable del orientador
+        self.nombre_orientador = "Orientador"
+        
         # Pipeline (se define en las subclases)
         self.pipeLine = None
 
@@ -37,7 +40,9 @@ class BaseIntermediario(ABC):
                     # Si es un string "None", ignorar
                     if isinstance(resultado, str) and resultado.strip().lower() == "none":
                         continue
-                    await self.sio.emit("evaluacion", resultado, room=self.sala)
+                    # Transformar respuestas si es necesario
+                    resultado_transformado = self._transformar_respuestas(resultado) if isinstance(resultado, list) else resultado
+                    await self.sio.emit("evaluacion", resultado_transformado, room=self.sala)
             except Exception as e:
                 logger.error(f"Error procesando mensaje en {self.sala}: {e}")
             finally:
@@ -84,7 +89,8 @@ class BaseIntermediario(ABC):
                 for r in respuestas_validas:
                     self._insert_in_db(agent_name=r["agente"], content=r["respuesta"])
                 
-                await self.sio.emit("evaluacion", respuestas_validas, room=self.sala)
+                respuestas_transformadas = self._transformar_respuestas(respuestas_validas)
+                await self.sio.emit("evaluacion", respuestas_transformadas, room=self.sala)
 
     # --- Callbacks y Eventos ---
     async def callback(self, elapsed_time: int, remaining_time: int, hito_alcanzado: Optional[int] = None):
@@ -110,7 +116,8 @@ class BaseIntermediario(ABC):
                     if isinstance(resultado, str) and resultado.strip().lower() == "none":
                         pass  # No emitir
                     else:
-                        await self.sio.emit("evaluacion", resultado, room=self.sala)
+                        respuestas_transformadas = self._transformar_respuestas(resultado)
+                        await self.sio.emit("evaluacion", respuestas_transformadas, room=self.sala)
         except Exception as e:
             logger.error(f"[Error callback timer {self.sala}]: {e}")
 
@@ -137,9 +144,31 @@ class BaseIntermediario(ABC):
             if respuestas_validas:
                 for r in respuestas_validas:
                     self._insert_in_db(agent_name=r["agente"], content=r["respuesta"])
-                await self.sio.emit("evaluacion", respuestas_validas, room=self.sala)
+                respuestas_transformadas = self._transformar_respuestas(respuestas_validas)
+                await self.sio.emit("evaluacion", respuestas_transformadas, room=self.sala)
 
     # --- Helpers ---
+    def _transformar_respuestas(self, respuestas: list) -> list:
+        """
+        Transforma respuestas para incluir debug payload.
+        Método base que puede ser sobrecargado en subclases.
+        Por defecto: debug=True si no es Orientador/Abogado-Del-Diablo
+        """
+        if not respuestas:
+            return []
+        
+        respuestas_transformadas = []
+        for r in respuestas:
+            payload = {
+                "agente": r.get("agente"),
+                "respuesta": r.get("respuesta"),
+                "debug": r.get("agente", "").lower() not in ["orientador", "abogado-del-diablo"]
+            }
+            if "mensajes_evaluados" in r:
+                payload["mensajes_evaluados"] = r["mensajes_evaluados"]
+            respuestas_transformadas.append(payload)
+        return respuestas_transformadas
+
     def _insert_in_db(self, agent_name, content, parent_id=None, used_ids=None):
         """Helper para centralizar inserciones en DB."""
         if self.room_session_id:

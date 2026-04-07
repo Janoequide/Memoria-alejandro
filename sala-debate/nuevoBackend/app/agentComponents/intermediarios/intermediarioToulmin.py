@@ -10,6 +10,9 @@ class IntermediarioToulmin(BaseIntermediario):
     def __init__(self, prompts: dict, sio, sala, room_session_id, config_multiagente=None):
         super().__init__(sio, sala, room_session_id)
         
+        # Nombre del orientador (default para Toulmin)
+        self.nombre_orientador = "Orientador"
+        
         # Extraemos lo específico de Toulmin
         self.tamañoVentana = config_multiagente.ventana_mensajes if config_multiagente else 5
         
@@ -52,7 +55,8 @@ class IntermediarioToulmin(BaseIntermediario):
             if res:
                 self._insert_in_db("Orientador", res[0]["respuesta"])
                 self.ultima_intervencion_ts = time.time()  # Actualizar timestamp de intervención
-            return res
+                return self._transformar_respuestas(res)
+            return None
 
         # Flujo de Ventana / Calidad
         res_validador = await self.pipeLine.entrar_mensaje_a_la_sala(username=userName, mensaje=message)
@@ -70,5 +74,5 @@ class IntermediarioToulmin(BaseIntermediario):
             
             self.ids_mensajes_ventana = []
             self.numeroMensajes = 0
-            return respuesta_cascada
+            return self._transformar_respuestas(respuesta_cascada)
         return None

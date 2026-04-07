@@ -10,6 +10,9 @@ class IntermediarioStandard(BaseIntermediario):
     def __init__(self, prompts: dict, sio, sala, room_session_id, config_multiagente=None):
         super().__init__(sio, sala, room_session_id)
         
+        # Nombre del orientador (default para StandardPipeline)
+        self.nombre_orientador = "Orientador"
+        
         self.pipeLine = StandardPipeline(
             factory=ReActAgentFactory(),
             prompt_validador=prompts.get("Validador"),
@@ -44,12 +47,13 @@ class IntermediarioStandard(BaseIntermediario):
             if res:
                 self._insert_in_db("Orientador", res[0]["respuesta"])
                 self.ultima_intervencion_ts = time.time()  # Actualizar timestamp de intervención
-            return res
+                return self._transformar_respuestas(res)
+            return None
 
         # Flujo estándar
         respuesta_pipeline = await self.pipeLine.entrar_mensaje_a_la_sala(username=userName, mensaje=message)
         if respuesta_pipeline:
             for r in respuesta_pipeline:
                 self._insert_in_db(r["agente"], r["respuesta"], parent_id=user_message_id)
-            return respuesta_pipeline
+            return self._transformar_respuestas(respuesta_pipeline)
         return None

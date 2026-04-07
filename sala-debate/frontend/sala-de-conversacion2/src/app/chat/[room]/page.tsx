@@ -14,6 +14,7 @@ export default function ChatRoom() {
   type EvaluacionData = {
     agente: string;
     respuesta: string;
+    debug?: boolean;
     mensajes_evaluados?: Array<{ usuario: string; mensaje: string }>;
   };
 
@@ -130,13 +131,12 @@ export default function ChatRoom() {
     const handleEvaluacion = (data: EvaluacionData[]|EvaluacionData) => {
       const mensajes = Array.isArray(data) ? data : [data];
 
-      mensajes.forEach(({agente, respuesta, mensajes_evaluados}) => {
+      mensajes.forEach(({agente, respuesta, mensajes_evaluados, debug}) => {
         if (!respuesta?.trim()) return;
     
-        if (agente.toLowerCase() === "orientador") {
-          setMessages((prev) => [...prev, { username: agente, content: respuesta }]);
-        } 
-        else if (agente.toLowerCase() === "curador" || agente.toLowerCase() === "validador") {
+        // Usar el campo "debug" para determinar si va a columna de debug o chat
+        if (debug === true) {
+          // debug=true: va a la columna de debug (Validador, Curador, etc.)
           setAgentMessages((prev) => [...prev, { username: agente, content: respuesta }]);
           // Guardar mensajes evaluados asociados a este agente
           if (mensajes_evaluados && mensajes_evaluados.length > 0) {
@@ -145,8 +145,8 @@ export default function ChatRoom() {
               [agente.toLowerCase()]: mensajes_evaluados
             }));
           }
-        }
-        else if (agente.toLowerCase() === "resumidor") {
+        } else {
+          // debug=false: va al chat principal (Orientador, Abogado-Del-Diablo, etc.)
           setMessages((prev) => [...prev, { username: agente, content: respuesta }]);
         }
       })
