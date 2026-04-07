@@ -186,7 +186,24 @@ class BaseIntermediario(ABC):
                 logger.error(f"Error DB ({agent_name}): {e}")
 
     def contiene_mencion_orientador(self, mensaje: str) -> bool:
-        return bool(re.search(r'@orientador\b', str(mensaje), re.IGNORECASE))
+        """
+        Verifica si el mensaje menciona al agente.
+        Acepta dos opciones:
+        1. Mención al nombre personalizado: "@abogado-del-diablo", "@orientador", etc.
+        2. Mención genérica por defecto: "@ia"
+        
+        Ejemplo: "Abogado-Del-Diablo" permite "@abogado-del-diablo" o "@ia"
+        """
+        mensaje_str = str(mensaje).lower()
+        
+        # Opción 1: Mención genérica por defecto
+        if re.search(r'@ia\b', mensaje_str, re.IGNORECASE):
+            return True
+        
+        # Opción 2: Mención al nombre personalizado del agente
+        nombre_mencion = self.nombre_orientador.lower().replace(" ", "-").replace("_", "-")
+        patron = rf'@{re.escape(nombre_mencion)}\b'
+        return bool(re.search(patron, mensaje_str, re.IGNORECASE))
 
     @abstractmethod
     async def agregarMensage(self, userName: str, message: str, user_message_id: int):

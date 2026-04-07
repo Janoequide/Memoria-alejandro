@@ -21,6 +21,7 @@ export default function ChatRoom() {
   const [show_validator, setShowValidator] = useState(false)
   const [showMentionBar, setShowMentionBar] = useState(false)
   const [mentionTarget, setMentionTarget] = useState<string | null>(null);
+  const [nombreAgente, setNombreAgente] = useState<string>("Orientador") // Nombre dinámico del agente
   const [elapsedTime, setElapsedTime] = useState<number>(0)
   const [remainingTime, setRemainingTime] = useState<number>(0)
 
@@ -61,7 +62,13 @@ export default function ChatRoom() {
   useEffect(() => {
     fetch(`${backend}/api/topics/${room}`)
     .then((res) => res.json())
-    .then((data) => setTema(data.tema))
+    .then((data) => {
+      setTema(data.tema)
+      // Obtener el nombre del agente (si está disponible en la API)
+      if (data.nombreAgente) {
+        setNombreAgente(data.nombreAgente)
+      }
+    })
   }, [room, backend])
 
   useEffect(() => {
@@ -209,18 +216,25 @@ export default function ChatRoom() {
     }
   }
 
-  const agentesMencionables = ["orientador"]
-
   const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
     setInput(value)
     const mentionMatch = value.match(/@(\w*)$/i); 
     if (mentionMatch) {
       const typed = mentionMatch[1].toLowerCase();
+      
+      // Aceptar "@ia" o el nombre personalizado del agente
+      const agentesMencionables = [
+        "ia",  // Atajo genérico
+        nombreAgente.toLowerCase().replace(/\s+/g, "").replace(/[_-]+/g, "") // Nombre normalizado del agente
+      ];
+      
       const matchAgent = agentesMencionables.find(a => a.startsWith(typed));
       if (matchAgent) {
         setShowMentionBar(true);
-        setMentionTarget(matchAgent.charAt(0).toUpperCase() + matchAgent.slice(1));
+        // Mostrar el nombre real del agente o "IA" si se menciona @ia
+        const displayName = matchAgent === "ia" ? "IA" : nombreAgente;
+        setMentionTarget(displayName);
       } else {
         setShowMentionBar(false);
         setMentionTarget(null);
