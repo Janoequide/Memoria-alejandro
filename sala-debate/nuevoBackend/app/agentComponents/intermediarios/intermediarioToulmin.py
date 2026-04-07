@@ -1,6 +1,10 @@
 from .base_intermediario import BaseIntermediario
 from ..pipelines.qualityPipeline import QualityPipeline
 from ..factory_agents import ReActAgentFactory
+import time
+import logging
+
+logger = logging.getLogger("intermediario_toulmin")
 
 class IntermediarioToulmin(BaseIntermediario):
     def __init__(self, prompts: dict, sio, sala, room_session_id, config_multiagente=None):
@@ -18,14 +22,34 @@ class IntermediarioToulmin(BaseIntermediario):
         # nombre de sala para los logs
         self.pipeLine.sala_name = sala
 
+        # Estado del Cooldown para @orientador
+        self.ultima_intervencion_ts = 0
+        self.cooldown_actual = 60
+        self.min_cooldown = 60
+        self.max_cooldown = 600
+
+        # Seguimiento de mensajes para ventana
+        self.numeroMensajes = 0
+        self.ids_mensajes_ventana = []
+
+    def puede_intervenir(self) -> bool:
+        """Devuelve True si el tiempo de enfriamiento ha pasado."""
+        return (time.time() - self.ultima_intervencion_ts) >= self.cooldown_actual
+
     async def agregarMensage(self, userName, message, user_message_id):
         self.hubo_mensaje_desde_ultimo_callback = True
 
-        # Reacción a mención @orientador
+        # Reacción a mención @orientador respeta cooldown
         if self.contiene_mencion_orientador(message):
+            if not self.puede_intervenir():
+                # Está en cooldown, ignorar mención
+                logger.info(f"[{self.sala}] @orientador mencionado pero en cooldown (resto: {int(self.cooldown_actual - (time.time() - self.ultima_intervencion_ts))}s)")
+                return None
+            
             res = await self.pipeLine.reactiveResponse(userName, message)
             if res:
                 self._insert_in_db("Orientador", res[0]["respuesta"])
+                self.ultima_intervencion_ts = time.time()  # Actualizar timestamp de intervención
             return res
 
         # Flujo de Ventana / Calidad
