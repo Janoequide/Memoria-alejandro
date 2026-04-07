@@ -22,11 +22,9 @@ class AbogadoPipeline(BasePipeline):
 
     def __init__(self, factory, prompt_validador, prompt_orientador, window_size: int = 5):
         super().__init__(timeout=15)
-        # Cambiar nombre del agente orientador para pipeline de Abogado del Diablo
-        self.orientador_agent_name = "AbogadoDelDiablo 😈"
         # Agentes específicos de este pipeline
         self.agenteValidador = factory.create_agent("Validador", prompt_validador)
-        self.agenteOrientador = factory.create_agent(self.orientador_agent_name, prompt_orientador)
+        self.agenteOrientador = factory.create_agent("Orientador", prompt_orientador)
         self.agentes = [self.agenteValidador, self.agenteOrientador]
 
         # métricas de actividad de los usuarios (inactividad + invitados suaves)
@@ -58,11 +56,11 @@ class AbogadoPipeline(BasePipeline):
         }
 
         # Lógica de bienvenida
-        mensaje = Msg(name="Host", role="system", content=f"Sesión iniciada. {self.orientador_agent_name}, explica el objetivo y menciona la pregunta del dilema, si es que hay una.")
+        mensaje = Msg(name="Host", role="system", content="Sesión iniciada. Orientador, explica el objetivo y menciona la pregunta del dilema, si es que hay una.")
         await self._broadcast(mensaje)
         res = await self._call_agent(self.agenteOrientador)
 
-        return [{"agente": self.orientador_agent_name, "respuesta": self.ensure_text(self.extract_content(res))}]
+        return [{"agente": "Orientador", "respuesta": self.ensure_text(self.extract_content(res))}]
 
     async def entrar_mensaje_a_la_sala(self, username: str, mensaje: str):
         """
@@ -170,7 +168,7 @@ class AbogadoPipeline(BasePipeline):
 
 
             await self._broadcast(res_ori)
-            respuestas.append({"agente": self.orientador_agent_name, "respuesta": self.ensure_text(self.extract_content(res_ori))})
+            respuestas.append({"agente": "Orientador", "respuesta": self.ensure_text(self.extract_content(res_ori))})
 
         return respuestas
     
@@ -247,13 +245,13 @@ class AbogadoPipeline(BasePipeline):
                 if not isinstance(resp_ori, Msg):
                     resp_ori = Msg(name=self.agenteOrientador.name, role="assistant", content=self.ensure_text(resp_ori))
                 await self._broadcast(resp_ori)
-                return [{"agente": self.orientador_agent_name, "respuesta": self.ensure_text(self.extract_content(resp_ori))}]
+                return [{"agente": "Orientador", "respuesta": self.ensure_text(self.extract_content(resp_ori))}]
 
         return [{"agente": "Host", "respuesta": mensaje}]
 
     async def mensaje_hito_temporal(self, hito: int, mensaje_base: str, elapsed_time: int, remaining_time: int):
         """
-        Genera una instrucción para que el agente reaccione a un hito (25%, 50%, etc.).
+        Genera una instrucción para que el Orientador reaccione a un hito (25%, 50%, etc.).
         """
         instruccion = f"""
         **HITO TEMPORAL ALCANZADO: {hito}% del tiempo completado**
@@ -261,7 +259,7 @@ class AbogadoPipeline(BasePipeline):
         Tiempo restante: {self.formato_tiempo(remaining_time)}
         {mensaje_base}
         
-        Por favor, como {self.orientador_agent_name}:
+        Por favor, como Orientador:
         1. Haz una breve reflexión sobre el progreso del debate hasta ahora
         2. Motiva a los participantes según el momento de la sesión
         3. Da recomendaciones específicas para aprovechar el tiempo {"restante" if hito < 100 else "que tuvieron"}
@@ -276,10 +274,10 @@ class AbogadoPipeline(BasePipeline):
             # Informamos a la sala sobre el hito
             await self._broadcast(msg_hito)
             
-            # Solicitamos la respuesta específica del AbogadoDelDiablo
-            agente_orientador = next((a for a in self.agentes if a.name == self.orientador_agent_name), None)
+            # Solicitamos la respuesta específica del Orientador
+            agente_orientador = next((a for a in self.agentes if a.name == "Orientador"), None)
             if not agente_orientador:
-                return [{"agente": self.orientador_agent_name, "respuesta": mensaje_base}]
+                return [{"agente": "Orientador", "respuesta": mensaje_base}]
 
             respuesta = await self._call_agent(agente_orientador, msg_hito)
             if not isinstance(respuesta, Msg):
@@ -287,11 +285,11 @@ class AbogadoPipeline(BasePipeline):
             await self._broadcast(respuesta)
             texto = self.ensure_text(self.extract_content(respuesta))
             
-            return [{"agente": self.orientador_agent_name, "respuesta": texto or mensaje_base}]
+            return [{"agente": "Orientador", "respuesta": texto or mensaje_base}]
             
         except Exception as e:
             logger.error(f"[Error hito temporal]: {e}")
-            return [{"agente": self.orientador_agent_name, "respuesta": mensaje_base}]
+            return [{"agente": "Orientador", "respuesta": mensaje_base}]
 
     async def evento_timer(self):
         """
@@ -307,17 +305,17 @@ class AbogadoPipeline(BasePipeline):
             )
         )
         
-        # Siempre ir directo al AbogadoDelDiablo para motivar la participación sin rutinas adicionales.
+        # Siempre ir directo al Orientador para motivar la participación sin rutinas adicionales.
         await self._broadcast(msg)
         
-        agente_orientador = next((a for a in self.agentes if a.name == self.orientador_agent_name), None)
+        agente_orientador = next((a for a in self.agentes if a.name == "Orientador"), None)
         if agente_orientador:
             respuesta = await self._call_agent(agente_orientador, msg)
             if not isinstance(respuesta, Msg):
                 respuesta = Msg(name=self.agenteOrientador.name, role="assistant", content=self.ensure_text(respuesta))
             await self._broadcast(respuesta)
             return [{
-                "agente": self.orientador_agent_name, 
+                "agente": "Orientador", 
                 "respuesta": self.ensure_text(self.extract_content(respuesta))
             }]
         return []

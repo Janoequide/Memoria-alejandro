@@ -23,9 +23,6 @@ class BasePipeline(ABC):
         self.sala_name: str | None = None  # nombre de la sala para los logs
         # registro manual de mensajes de usuario para logging
         self._user_history: list[dict] = []
-        
-        # Nombre del agente orientador (puede ser sobrescrito en subclases)
-        self.orientador_agent_name = "Orientador"
     
     # Hacer disponible formato_tiempo como método
     def formato_tiempo(self, segundos: int) -> str:
