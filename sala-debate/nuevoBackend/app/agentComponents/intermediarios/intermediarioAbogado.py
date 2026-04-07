@@ -56,7 +56,7 @@ class IntermediarioAbogado(BaseIntermediario):
                 mensajes_ventana = getattr(self.pipeLine, '_window_buffer', [])
                 self.cooldown_actual = self.calcular_cooldown_dinamico(mensajes_ventana)
                 self.ultima_intervencion_ts = time.time()
-                print(f"--- Cooldown actualizado: {int(self.cooldown_actual)}s ---")
+                print(f"\n✓ LLM LLAMADA EXITOSA - Cooldown actualizado: {int(self.cooldown_actual)}s\n")
 
     async def agregarMensage(self, userName, message, user_message_id):
         self.hubo_mensaje_desde_ultimo_callback = True
@@ -65,7 +65,9 @@ class IntermediarioAbogado(BaseIntermediario):
         if self.contiene_mencion_orientador(message):
             if not self.puede_intervenir():
                 # Está en cooldown, ignorar mención
-                logger.info(f"[{self.sala}] @orientador mencionado pero en cooldown (resto: {int(self.cooldown_actual - (time.time() - self.ultima_intervencion_ts))}s)")
+                tiempo_restante = int(self.cooldown_actual - (time.time() - self.ultima_intervencion_ts))
+                print(f"\n⏳ COOLDOWN ACTIVO - No se puede invocar LLM. Tiempo restante: {tiempo_restante}s\n")
+                logger.info(f"[{self.sala}] @orientador mencionado pero en cooldown (resto: {tiempo_restante}s)")
                 return None
             
             res = await self.pipeLine.reactiveResponse(userName, message)

@@ -108,7 +108,7 @@ class AbogadoPipeline(BasePipeline):
         # Disparar evento cuando se alcanza exactamente el tamaño de ventana
         if len(self._window_buffer) == self.window_size:
             if self.check_cooldown_callback and not self.check_cooldown_callback():
-                print("Estoy en cooldown!!!!!!!!!!!")
+                print("\n⏳ COOLDOWN ACTIVO - Ventana completa pero LLM está en cooldown. Evaluación pospuesta.\n")
                 # Si hay cooldown, NO evaluamos y NO vaciamos el buffer.
                 # Así, el próximo mensaje que llegue volverá a intentar disparar la ventana.
                 logger.info("[Ventana] Evaluación pospuesta por Cooldown activo.")

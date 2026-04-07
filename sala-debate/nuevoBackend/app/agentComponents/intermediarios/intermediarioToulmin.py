@@ -43,7 +43,9 @@ class IntermediarioToulmin(BaseIntermediario):
         if self.contiene_mencion_orientador(message):
             if not self.puede_intervenir():
                 # Está en cooldown, ignorar mención
-                logger.info(f"[{self.sala}] @orientador mencionado pero en cooldown (resto: {int(self.cooldown_actual - (time.time() - self.ultima_intervencion_ts))}s)")
+                tiempo_restante = int(self.cooldown_actual - (time.time() - self.ultima_intervencion_ts))
+                print(f"\n⏳ COOLDOWN ACTIVO - No se puede invocar LLM. Tiempo restante: {tiempo_restante}s\n")
+                logger.info(f"[{self.sala}] @orientador mencionado pero en cooldown (resto: {tiempo_restante}s)")
                 return None
             
             res = await self.pipeLine.reactiveResponse(userName, message)
