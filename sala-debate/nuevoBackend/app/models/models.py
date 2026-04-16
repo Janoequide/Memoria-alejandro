@@ -3,12 +3,12 @@ import uuid
 import os
 import enum
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID as PyUUID  # Renombrar para evitar conflicto
 from sqlalchemy import (
     Column, Integer, String, Text, DateTime, ForeignKey, func, select, JSON
 )
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.dialects.postgresql import UUID, ARRAY
+from sqlalchemy.dialects.postgresql import UUID as SQLALCHEMY_UUID, ARRAY  # Renombrar
 from sqlalchemy.orm import declarative_base, relationship, scoped_session, sessionmaker
 from sqlalchemy import create_engine, Enum
 from dotenv import load_dotenv
@@ -21,6 +21,17 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Configuración de base de datos
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+
+# Registrar adapter para UUID con psycopg2
+try:
+    import psycopg2.extensions
+    def adapt_uuid(uuid_obj):
+        return psycopg2.extensions.QuotedString(str(uuid_obj))
+    psycopg2.extensions.register_adapter(PyUUID, adapt_uuid)
+    print("[INFO] UUID adapter registered with psycopg2")
+except Exception as e:
+    print(f"[WARNING] Could not register UUID adapter: {e}")
+
 Session = scoped_session(sessionmaker(bind=engine))
 Base = declarative_base()
 
@@ -57,11 +68,22 @@ class RoomName(Base):
 class RoomSession(Base):
     __tablename__ = 'room_sessions'
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(SQLALCHEMY_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     room_name = Column(Text, nullable=False)
     topic = Column(Text, nullable=True)
     status = Column(Enum(SessionStatus), nullable=False, default=SessionStatus.active)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+# Tabla: room_participants (Persistencia de participantes)
+class RoomParticipant(Base):
+    __tablename__ = 'room_participants'
+
+    id = Column(Integer, primary_key=True)
+    room_session_id = Column(SQLALCHEMY_UUID(as_uuid=True), ForeignKey('room_sessions.id', ondelete='CASCADE'), nullable=False)
+    username = Column(String(255), nullable=False)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    joined_at = Column(DateTime(timezone=True), server_default=func.now())
+    left_at = Column(DateTime(timezone=True), nullable=True)
 
 class Tema(Base):
     __tablename__ = 'temas'
@@ -75,7 +97,7 @@ class Message(Base):
     __tablename__ = 'messages'
 
     id = Column(Integer, primary_key=True)
-    room_session_id = Column(UUID(as_uuid=True), ForeignKey('room_sessions.id', ondelete='CASCADE'), nullable=False)
+    room_session_id = Column(SQLALCHEMY_UUID(as_uuid=True), ForeignKey('room_sessions.id', ondelete='CASCADE'), nullable=False)
     user_id = Column(Text, nullable=True)
     agent_name = Column(String(50), nullable=True)
     sender_type = Column(Enum(SenderType),nullable=False)
@@ -579,7 +601,7 @@ def get_sessions_by_day_from_db(day_str: str):
 
 
 # 3) Obtener mensajes por session_id
-def get_messages_by_session_from_db(session_id: UUID):
+def get_messages_by_session_from_db(session_id: PyUUID):
     session = Session()
     try:
         query = (
@@ -672,9 +694,9 @@ def export_session_logs(room_session_id: str, filepath: str) -> dict:
     try:
         # Convertir string a UUID si es necesario
         try:
-            session_uuid = UUID(room_session_id)
+            session_uuid = PyUUID(room_session_id)
         except:
-            session_uuid = UUID(str(room_session_id))
+            session_uuid = PyUUID(str(room_session_id))
         
         # Obtener datos de la sesión
         room_session = session.query(RoomSession).filter_by(id=session_uuid).first()
@@ -729,6 +751,215 @@ def export_session_logs(room_session_id: str, filepath: str) -> dict:
             "filepath": "",
             "error": str(e)
         }
+    
+    finally:
+        session.close()
+
+
+# ============= FUNCIONES PARA GESTIÓN DE PARTICIPANTES =============
+
+def add_participant_to_room(room_session_id: str, username: str, user_id: int = None) -> dict:
+    """
+    Agrega un participante a una sesión de sala.
+    Retorna dict con: {success: bool, participant_id: Optional[int], error: Optional[str]}
+    """
+    session = Session()
+    try:
+        # Debug
+        print(f"[DEBUG] add_participant_to_room: room_session_id={room_session_id}, type={type(room_session_id)}")
+        
+        # Convertir a PyUUID si es string
+        if isinstance(room_session_id, str):
+            try:
+                session_uuid = PyUUID(room_session_id)
+            except (ValueError, TypeError) as e:
+                return {"success": False, "participant_id": None, "error": f"Invalid UUID format: {str(e)}"}
+        else:
+            session_uuid = room_session_id
+        
+        print(f"[DEBUG] Converted UUID: {session_uuid}")
+        
+        # Verificar que la sesión existe
+        room_session = session.query(RoomSession).filter(
+            RoomSession.id == session_uuid
+        ).first()
+        
+        print(f"[DEBUG] Session query result: {room_session}")
+        
+        if not room_session:
+            print(f"[DEBUG] Session not found for id: {session_uuid}")
+            return {"success": False, "participant_id": None, "error": "Session not found"}
+        
+        # Crear nuevo participante - pasar UUID como objeto
+        new_participant = RoomParticipant(
+            room_session_id=session_uuid,  # UUID object
+            username=username,
+            user_id=user_id
+        )
+        session.add(new_participant)
+        session.commit()
+        session.refresh(new_participant)
+        
+        print(f"[DEBUG] Participant added successfully: id={new_participant.id}")
+        
+        return {
+            "success": True,
+            "participant_id": new_participant.id,
+            "error": None
+        }
+    
+    except SQLAlchemyError as e:
+        session.rollback()
+        print(f"[ERROR] SQLAlchemy Error: {str(e)}")
+        return {"success": False, "participant_id": None, "error": str(e)}
+    except Exception as e:
+        session.rollback()
+        print(f"[ERROR] Unexpected error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "participant_id": None, "error": str(e)}
+    
+    finally:
+        session.close()
+
+
+def participant_exists_in_session(room_session_id: str, username: str) -> bool:
+    """
+    Verifica si un participante activo (no ha salido) ya existe en una sesión.
+    Retorna True si existe, False si no existe.
+    """
+    session = Session()
+    try:
+        if isinstance(room_session_id, str):
+            try:
+                session_uuid = PyUUID(room_session_id)
+            except (ValueError, TypeError):
+                return False
+        else:
+            session_uuid = room_session_id
+        
+        existing = session.query(RoomParticipant).filter(
+            RoomParticipant.room_session_id == session_uuid,
+            RoomParticipant.username == username,
+            RoomParticipant.left_at == None  # Solo participantes activos
+        ).first()
+        
+        return existing is not None
+    
+    except Exception as e:
+        print(f"[ERROR] Error checking participant existence: {str(e)}")
+        return False
+    
+    finally:
+        session.close()
+
+
+def get_participants_count_for_active_rooms() -> list[dict]:
+    """
+    Obtiene el conteo de participantes activos (no han salido) por cada sala activa.
+    Retorna lista de dicts: [{room_name: str, participants_count: int, session_id: str}, ...]
+    Ordenado por room_name.
+    """
+    session = Session()
+    try:
+        # Obtener todas las sesiones activas con su conteo de participantes
+        query = (
+            session.query(
+                RoomSession.room_name,
+                RoomSession.id,
+                func.count(RoomParticipant.id).label('participants_count')
+            )
+            .join(
+                RoomParticipant,
+                RoomSession.id == RoomParticipant.room_session_id,
+                isouter=True
+            )
+            .filter(RoomSession.status == SessionStatus.active)
+            .filter(RoomParticipant.left_at == None)  # Solo participantes activos
+            .group_by(RoomSession.room_name, RoomSession.id)
+            .order_by(RoomSession.room_name)
+        )
+        
+        results = query.all()
+        
+        return [
+            {
+                "room_name": r[0],
+                "session_id": str(r[1]),
+                "participants_count": r[2] if r[2] else 0
+            }
+            for r in results
+        ]
+    
+    finally:
+        session.close()
+
+
+def get_room_with_least_participants() -> dict | None:
+    """
+    Obtiene la sala activa con menor cantidad de participantes.
+    Si hay múltiples salas con el mismo mínimo, retorna la de menor índice alfabético.
+    Retorna dict: {room_name: str, session_id: str, participants_count: int}
+    Si no hay salas activas, retorna None.
+    """
+    session = Session()
+    try:
+        # Obtener conteo de participantes por sala activa
+        query = (
+            session.query(
+                RoomSession.room_name,
+                RoomSession.id,
+                func.count(RoomParticipant.id).label('participants_count')
+            )
+            .join(
+                RoomParticipant,
+                RoomSession.id == RoomParticipant.room_session_id,
+                isouter=True
+            )
+            .filter(RoomSession.status == SessionStatus.active)
+            .filter(RoomParticipant.left_at == None)  # Solo participantes activos
+            .group_by(RoomSession.room_name, RoomSession.id)
+            .order_by(
+                func.count(RoomParticipant.id),  # Menor cantidad de participantes
+                RoomSession.room_name  # En caso de empate, por nombre alfabético
+            )
+        )
+        
+        result = query.first()
+        
+        if not result:
+            return None
+        
+        return {
+            "room_name": result[0],
+            "session_id": str(result[1]),
+            "participants_count": result[2] if result[2] else 0
+        }
+    
+    finally:
+        session.close()
+
+
+def remove_participant_from_room(participant_id: int) -> dict:
+    """
+    Marca a un participante como salido (actualiza left_at).
+    Retorna dict con: {success: bool, error: Optional[str]}
+    """
+    session = Session()
+    try:
+        participant = session.query(RoomParticipant).filter_by(id=participant_id).first()
+        
+        if not participant:
+            return {"success": False, "error": "Participant not found"}
+        
+        participant.left_at = datetime.now(datetime.now().astimezone().tzinfo)
+        session.commit()
+        
+        return {"success": True, "error": None}
+    
+    except SQLAlchemyError as e:
+        session.rollback()
+        return {"success": False, "error": str(e)}
     
     finally:
         session.close()

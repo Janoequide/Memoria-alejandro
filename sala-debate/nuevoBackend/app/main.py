@@ -37,9 +37,15 @@ from app.models.models import (
     insert_tema,
     update_tema,
     create_room_names_batch,
-    export_session_logs
+    export_session_logs,
+    add_participant_to_room,
+    get_participants_count_for_active_rooms,
+    get_room_with_least_participants,
+    remove_participant_from_room,
+    participant_exists_in_session
     )
 from pydantic import BaseModel
+from typing import Optional
 
 class MultiAgentConfigSchema(BaseModel):
     ventana_mensajes: int
@@ -509,3 +515,65 @@ def get_pipelines():
     para que el frontend pueda llenar un selector/dropdown.
     """
     return list(INTERMEDIARIO_MAP.keys())
+
+
+# ==================== ENDPOINTS PARA DISTRIBUCION AUTOMATICA ====================
+
+@app.get("/api/rooms/participants/count")
+def get_participants_count():
+    """
+    Obtiene el conteo de participantes activos por cada sala.
+    Retorna lista: [{room_name, session_id, participants_count}, ...]
+    """
+    try:
+        counts = get_participants_count_for_active_rooms()
+        return {"rooms": counts}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class AutoJoinRequest(BaseModel):
+    username: str
+    user_id: Optional[int] = None  # Opcional
+
+@app.post("/api/rooms/auto-join")
+def auto_join_room(request: AutoJoinRequest):
+    """
+    Sirve automáticamente al usuario a la sala con menos participantes.
+    Si hay múltiples salas con el mismo mínimo, retorna la de menor índice.
+    Retorna: {room_name, session_id, participants_count}
+    Si no hay salas activas, retorna error 404.
+    """
+    try:
+        best_room = get_room_with_least_participants()
+        
+        if not best_room:
+            raise HTTPException(
+                status_code=404,
+                detail="No open rooms available"
+            )
+        
+        # Agregar participante a la BD
+        result = add_participant_to_room(
+            room_session_id=best_room["session_id"],
+            username=request.username,
+            user_id=request.user_id
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error adding participant: {result['error']}"
+            )
+        
+        return {
+            "room_name": best_room["room_name"],
+            "session_id": best_room["session_id"],
+            "participants_count": best_room["participants_count"],
+            "participant_id": result["participant_id"]
+        }
+    
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

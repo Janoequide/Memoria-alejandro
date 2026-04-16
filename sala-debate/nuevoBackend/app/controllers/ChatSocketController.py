@@ -3,12 +3,17 @@ import socketio
 from app.models.models import (
     get_active_room_session_id,
     insert_message,
-    SenderType
+    SenderType,
+    add_participant_to_room,
+    remove_participant_from_room,
+    participant_exists_in_session
 )
 from app.agentComponents.intermediarios.base_intermediario import BaseIntermediario
 
 # Estructura: lobby_users[room][username] = set(sid)
 lobby_users: dict[str, dict[str, set[str]]] = {}
+# Estructura: sid_to_participant[sid] = participant_id (para poder marcar como left)
+sid_to_participant: dict[str, int] = {}
 lobby_lock = asyncio.Lock()   
 async def add_user(room: str, username: str, sid: str):
     """
@@ -51,6 +56,15 @@ def register_sockets(sio:socketio.AsyncServer, salas_activas):
         print(f"Cliente conectado: {sid}")
     @sio.event
     async def disconnect(sid):
+        # Marcar participante como salido en BD
+        try:
+            participant_id = sid_to_participant.get(sid)
+            if participant_id:
+                remove_participant_from_room(participant_id)
+                del sid_to_participant[sid]
+        except Exception as e:
+            print(f"Error removiendo participante de BD: {str(e)}")
+        
         # Buscamos en qué sala está este SID
         for room, users in list(lobby_users.items()):
             for username, sockets in list(users.items()):
@@ -77,6 +91,25 @@ def register_sockets(sio:socketio.AsyncServer, salas_activas):
         await sio.enter_room(sid, room)
         await add_user(room, username, sid)
         
+        # Registrar participante en la BD SOLO si no está registrado
+        try:
+            session_id = get_active_room_session_id(room)
+            if session_id:
+                # Verificar si el participante ya existe
+                if not participant_exists_in_session(session_id, username):
+                    result = add_participant_to_room(
+                        room_session_id=session_id,
+                        username=username,
+                        user_id=None
+                    )
+                    if result["success"] and result["participant_id"]:
+                        sid_to_participant[sid] = result["participant_id"]
+                    print(f"[DEBUG] Nuevo participante registrado: {username}")
+                else:
+                    print(f"[DEBUG] Participante ya existe: {username}, no se registra nuevamente")
+        except Exception as e:
+            print(f"Error registrando participante en BD: {str(e)}")
+        
         await sio.emit(
             "status",
             {"msg": f"{username} ha entrado a la sala {room}."},
@@ -90,6 +123,15 @@ def register_sockets(sio:socketio.AsyncServer, salas_activas):
     async def on_leave(sid, data):
         username = data["username"]
         room = data["room"]
+
+        # Marcar participante como salido en BD
+        try:
+            participant_id = sid_to_participant.get(sid)
+            if participant_id:
+                remove_participant_from_room(participant_id)
+                del sid_to_participant[sid]
+        except Exception as e:
+            print(f"Error removiendo participante de BD: {str(e)}")
 
         await sio.leave_room(sid, room)
         await remove_user(room, username, sid)

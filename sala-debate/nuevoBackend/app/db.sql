@@ -12,6 +12,7 @@ CREATE DATABASE chatdb OWNER chat_user;
 -- 1. CREACIÓN DE TABLAS
 -- ==========================================
 -- Borrar tablas en orden de dependencia
+DROP TABLE IF EXISTS room_participants CASCADE;
 DROP TABLE IF EXISTS messages CASCADE;
 DROP TABLE IF EXISTS room_sessions CASCADE;
 DROP TABLE IF EXISTS agent_prompts CASCADE;
@@ -52,6 +53,16 @@ CREATE TABLE room_sessions (
     topic TEXT,
     status VARCHAR(20) DEFAULT 'active', -- Tu compañero no tenía NOT NULL explícito en el dump
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4.5 Tabla RoomParticipants (Persistencia de participantes)
+CREATE TABLE room_participants (
+    id SERIAL PRIMARY KEY,
+    room_session_id UUID NOT NULL REFERENCES room_sessions(id) ON DELETE CASCADE,
+    username VARCHAR(255) NOT NULL,
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL, -- Opcional si está autenticado
+    joined_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    left_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
 );
 
 -- 5. Tabla Temas (La agregamos porque tu código Python la pide)
