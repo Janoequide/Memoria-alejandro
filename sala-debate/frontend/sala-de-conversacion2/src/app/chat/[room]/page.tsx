@@ -411,8 +411,8 @@ export default function ChatRoom() {
                           isSystem
                             ? "bg-gray-200 text-gray-700"
                             : isOwn
-                            ? "bg-green-600 text-white"
-                            : "bg-white border border-gray-200 text-gray-800"
+                            ? "bg-green-500 text-white rounded-br-none"
+                            : "bg-blue-200 text-gray-800 rounded-bl-none"
                         }`}
                       >
                         {!isSystem && !isOwn && (
