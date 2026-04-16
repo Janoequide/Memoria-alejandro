@@ -3,6 +3,7 @@ import uuid
 import os
 import enum
 from pathlib import Path
+from uuid import UUID
 from sqlalchemy import (
     Column, Integer, String, Text, DateTime, ForeignKey, func, select, JSON
 )
@@ -598,5 +599,136 @@ def get_messages_by_session_from_db(session_id: UUID):
             }
             for m in rows
         ]
+    finally:
+        session.close()
+
+
+# ============= NUEVAS FUNCIONES PARA FEATURE DE MÚLTIPLES SALAS =============
+
+def create_room_names_batch(name_list: list[str]) -> dict:
+    """
+    Obtiene o crea múltiples salas en la tabla room_names.
+    Si un nombre ya existe, NO agrega sufijos - simplemente lo reutiliza.
+    Retorna dict con: {created: int, failed: int, rooms_created: list[dict]}
+    """
+    session = Session()
+    try:
+        created_rooms = []
+        failed_count = 0
+        
+        for room_name in name_list:
+            try:
+                # Verificar si ya existe
+                existing = session.query(RoomName).filter_by(name=room_name).first()
+                
+                if existing:
+                    # Si ya existe, reutilizarla (no agregar sufijo)
+                    created_rooms.append({"id": existing.id, "name": existing.name})
+                    print(f"✓ Sala '{room_name}' ya existe, reutilizando")
+                else:
+                    # Si no existe, crearla
+                    new_room = RoomName(name=room_name)
+                    session.add(new_room)
+                    session.flush()  # Flush para detectar errores antes de commit
+                    created_rooms.append({"id": new_room.id, "name": new_room.name})
+                    print(f"✓ Sala '{room_name}' creada")
+                    
+            except Exception as e:
+                print(f"Error con sala {room_name}: {str(e)}")
+                failed_count += 1
+        
+        # Commit de todas las operaciones
+        session.commit()
+        
+        return {
+            "created": len(created_rooms),
+            "failed": failed_count,
+            "rooms_created": created_rooms
+        }
+    
+    except SQLAlchemyError as e:
+        session.rollback()
+        print(f"Error de base de datos: {str(e)}")
+        raise e
+    
+    except Exception as e:
+        session.rollback()
+        print(f"Error inesperado: {str(e)}")
+        raise e
+    
+    finally:
+        session.close()
+
+
+def export_session_logs(room_session_id: str, filepath: str) -> dict:
+    """
+    Exporta los logs de una sesión a un archivo JSON.
+    Retorna dict con: {success: bool, filepath: str, error: Optional[str]}
+    """
+    import json
+    from pathlib import Path
+    
+    session = Session()
+    try:
+        # Convertir string a UUID si es necesario
+        try:
+            session_uuid = UUID(room_session_id)
+        except:
+            session_uuid = UUID(str(room_session_id))
+        
+        # Obtener datos de la sesión
+        room_session = session.query(RoomSession).filter_by(id=session_uuid).first()
+        if not room_session:
+            return {"success": False, "filepath": "", "error": "Session not found"}
+        
+        # Obtener mensajes de la sesión
+        messages_query = (
+            session.query(Message)
+            .filter(Message.room_session_id == session_uuid)
+            .order_by(Message.created_at)
+            .all()
+        )
+        
+        # Construir estructura de logs
+        messages_list = []
+        for msg in messages_query:
+            messages_list.append({
+                "sender": msg.user_id if msg.sender_type == SenderType.user else msg.agent_name,
+                "sender_type": msg.sender_type.value,
+                "content": msg.content,
+                "timestamp": msg.created_at.isoformat() if msg.created_at else None
+            })
+        
+        log_data = {
+            "room_name": room_session.room_name,
+            "topic": room_session.topic,
+            "datetime_start": room_session.created_at.isoformat() if room_session.created_at else None,
+            "datetime_end": datetime.now().isoformat(),
+            "total_messages": len(messages_list),
+            "messages": messages_list
+        }
+        
+        # Crear carpeta /logs si no existe
+        log_path = Path(filepath)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Escribir archivo JSON
+        with open(log_path, 'w', encoding='utf-8') as f:
+            json.dump(log_data, f, ensure_ascii=False, indent=2)
+        
+        return {
+            "success": True,
+            "filepath": str(log_path),
+            "error": None
+        }
+    
+    except Exception as e:
+        print(f"Error al exportar logs: {str(e)}")
+        return {
+            "success": False,
+            "filepath": "",
+            "error": str(e)
+        }
+    
     finally:
         session.close()

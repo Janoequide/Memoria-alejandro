@@ -1,18 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { io, Socket } from 'socket.io-client'
 
 interface DebateTopic {
   id: number
   titulo: string
   tema_text: string
   created_at?: string
-}
-
-interface Room {
-  id: number
-  name: string
 }
 
 interface RoomStatus {
@@ -26,19 +22,20 @@ interface RoomConfigProps {
 
 export default function RoomConfig({ backend }: RoomConfigProps) {
   const router = useRouter()
+  const socketRef = useRef<Socket | null>(null)
 
-  const [availableRooms, setAvailableRooms] = useState<Room[]>([])
   const [roomStatuses, setRoomStatuses] = useState<RoomStatus[]>([])
   const [debateTopics, setDebateTopics] = useState<DebateTopic[]>([])
   
   // NUEVO: Estado para las pipelines que vienen del backend
   const [availablePipelines, setAvailablePipelines] = useState<string[]>([])
   
-  const [room, setRoom] = useState('')
   const [topic, setTopic] = useState('')
   const [selectedCaseKey, setSelectedCaseKey] = useState('')
   const [idioma, setIdioma] = useState('español')
   const [pipeline, setPipeline] = useState("standard")
+  const [quantity, setQuantity] = useState(1)
+  const [loading, setLoading] = useState(false)
 
   // Fetch de pipelines disponibles
   const fetchPipelines = async () => {
@@ -54,17 +51,6 @@ export default function RoomConfig({ backend }: RoomConfigProps) {
       }
     } catch (error) {
       console.error('Error al cargar pipelines:', error)
-    }
-  }
-
-  const fetchRooms = async () => {
-    try {
-      const res = await fetch(`${backend}/api/rooms`)
-      if (!res.ok) throw new Error('Error al obtener salas')
-      const data = await res.json()
-      setAvailableRooms(data)
-    } catch (error) {
-      console.error('Error al cargar salas:', error)
     }
   }
 
@@ -91,10 +77,30 @@ export default function RoomConfig({ backend }: RoomConfigProps) {
   }
 
   useEffect(() => {
-    fetchRooms()
     fetchStatuses()
     fetchDebateTopics()
     fetchPipelines() // <--- Nueva llamada al montar el componente
+
+    // Configurar Socket.io listener para actualización de salas en tiempo real
+    socketRef.current = io(backend, {
+      path: '/socket.io',
+      transports: ['websocket'],
+    })
+
+    const socket = socketRef.current
+
+    socket.on('connect', () => {
+      console.log('RoomConfig socket connected:', socket.id)
+    })
+
+    socket.on('rooms_updated', (data: RoomStatus[]) => {
+      console.log('Salas actualizadas:', data)
+      setRoomStatuses(data)
+    })
+
+    return () => {
+      socket.disconnect()
+    }
   }, [backend])
 
   const handleCaseChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -109,14 +115,55 @@ export default function RoomConfig({ backend }: RoomConfigProps) {
     }
   }
 
-  const handleEnter = () => {
-    if (!room || !topic) return
-    sessionStorage.setItem('chatIdioma', idioma)
-    sessionStorage.setItem('chatTopic', topic)
-    sessionStorage.setItem('chatRoom', room)
-    sessionStorage.setItem("pipelineType", pipeline)
+  const handleCreateBulk = async () => {
+    if (!topic || !pipeline) {
+      alert('Por favor selecciona tema y pipeline')
+      return
+    }
 
-    router.push(`/chat/${room}/lobby`)
+    if (quantity < 1 || quantity > 20) {
+      alert('La cantidad debe estar entre 1 y 20')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const res = await fetch(`${backend}/api/rooms/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quantity,
+          base_name: 'Sala',
+          topic,
+          pipeline_type: pipeline,
+          idioma
+        })
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        alert(`Error: ${errorData.detail || 'No se pudieron crear las salas'}`)
+        setLoading(false)
+        return
+      }
+
+      const data = await res.json()
+      alert(`✅ ${data.quantity_created} sala(s) creadas exitosamente`)
+      
+      // Refrescar lista de salas
+      await fetchStatuses()
+      
+      // Limpiar formulario
+      setQuantity(1)
+      setTopic('')
+      setSelectedCaseKey('')
+      setPipeline('standard')
+    } catch (error) {
+      console.error('Error al crear salas:', error)
+      alert('Error al crear salas')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleCloseRoom = async (roomName: string) => {
@@ -149,10 +196,12 @@ export default function RoomConfig({ backend }: RoomConfigProps) {
       <div className="border rounded-lg p-4 shadow bg-gray-50 flex flex-col h-full max-h-[700px] overflow-x-hidden overflow-y-auto">
         <h2 className="text-lg font-semibold mb-4 sticky top-0 bg-gray-50 pb-2 z-10 border-b">Estado de salas</h2>
         {roomStatuses.length === 0 ? (
-          <p className="text-sm text-gray-500">No hay información de salas.</p>
+          <p className="text-sm text-gray-500">No hay salas activas.</p>
         ) : (
           <ul className="space-y-3">
-            {roomStatuses.map((r, idx) => (
+            {roomStatuses
+              .filter((r) => r.status === 'active')
+              .map((r, idx) => (
               <li key={idx} className="flex justify-between items-center border-b border-gray-200 pb-3 gap-2">
                 
                 {/* Textos: Nombre de la sala y estado */}
@@ -198,20 +247,17 @@ export default function RoomConfig({ backend }: RoomConfigProps) {
       <div>
         <h1 className="text-2xl font-bold mb-6">Configuración de la Sala</h1>
 
-        <div className="mb-4">
-          <label className="block mb-2 text-sm font-medium">Elige la sala:</label>
-          <select
+        <div className="mb-6">
+          <label className="block mb-2 text-sm font-medium">Cantidad de salas a crear:</label>
+          <input
+            type="number"
+            min="1"
+            max="20"
+            value={quantity}
+            onChange={(e) => setQuantity(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
             className="border p-2 w-full rounded cursor-pointer"
-            value={room}
-            onChange={(e) => setRoom(e.target.value)}
-          >
-            <option value="">-- Selecciona una sala --</option>
-            {availableRooms.map((r) => (
-              <option key={r.id} value={r.name}>
-                {r.name}
-              </option>
-            ))}
-          </select>
+          />
+          <p className="text-xs text-gray-500 mt-1">Mínimo 1, máximo 20 salas</p>
         </div>
 
         <div className="mb-6">
@@ -263,11 +309,11 @@ export default function RoomConfig({ backend }: RoomConfigProps) {
 
         <div>
           <button
-            onClick={handleEnter}
-            disabled={!room || !topic || availablePipelines.length === 0}
+            onClick={handleCreateBulk}
+            disabled={!topic || availablePipelines.length === 0 || loading}
             className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 transition w-full disabled:bg-gray-400 font-medium shadow-md"
           >
-            Crear y Entrar a la Sala
+            {loading ? 'Creando...' : 'Crear sala(s)'}
           </button>
         </div>
 

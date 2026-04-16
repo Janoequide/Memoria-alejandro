@@ -35,7 +35,9 @@ from app.models.models import (
     get_sessions_by_day_from_db,
     get_messages_by_session_from_db,
     insert_tema,
-    update_tema
+    update_tema,
+    create_room_names_batch,
+    export_session_logs
     )
 from pydantic import BaseModel
 
@@ -136,18 +138,145 @@ async def create_session(room_name: str, payload: dict):
 
     return {"status": "created", "room": room_name}
 
+@app.post("/api/rooms/bulk", status_code=201)
+async def create_rooms_bulk(payload: dict):
+    """
+    Crea y inicializa múltiples salas en un solo request.
+    Payload: {quantity: int, base_name: str, topic: str, pipeline_type: str, idioma: str}
+    """
+    try:
+        quantity = payload.get("quantity", 1)
+        base_name = payload.get("base_name", "Sala")
+        topic = payload.get("topic", "")
+        pipeline_type = payload.get("pipeline_type", "standard")
+        idioma = payload.get("idioma", "español")
+        
+        # Validar cantidad
+        if not isinstance(quantity, int) or quantity < 1 or quantity > 20:
+            raise HTTPException(status_code=400, detail="Quantity must be between 1 and 20")
+        
+        if not topic or not pipeline_type:
+            raise HTTPException(status_code=400, detail="topic and pipeline_type are required")
+        
+        # Generar nombres de salas
+        room_names = [f"{base_name}-{i}" for i in range(1, quantity + 1)]
+        
+        # Crear salas en la BD
+        result = create_room_names_batch(room_names)
+        
+        # NUEVA: Inicializar cada sala creada
+        created_rooms_initialized = []
+        for room_name in [r["name"] for r in result["rooms_created"]]:
+            try:
+                # Obtener o crear sesión activa para la sala
+                room_session = get_or_create_Active_room_session(room_name, topic)
+                
+                if not room_session.get("primera_inicializacion", False):
+                    print(f"⚠️ Sala {room_name} ya tenía sesión activa, saltando")
+                    continue
+                
+                # Obtener prompts según pipeline_type
+                current_prompts = get_prompts_by_system(pipeline_type)
+                prompts_preparados = {k: v.replace("{tema}", topic) for k, v in current_prompts.items()}
+                
+                # Obtener configuración multiagente
+                config_ma = get_multiagent_config()
+                
+                # Crear instancia del intermediario
+                IntermediarioClass = get_intermediario_class(pipeline_type)
+                intermediario = IntermediarioClass(
+                    prompts=prompts_preparados,
+                    sio=sio,
+                    sala=room_name,
+                    room_session_id=room_session["id"],
+                    config_multiagente=config_ma
+                )
+                
+                # Guardar en diccionario de salas activas
+                salas_activas[room_name] = intermediario
+                
+                # Obtener lista de usuarios en el lobby (probablemente vacía ahora)
+                usuarios_sala = await get_user_list(room_name)
+                
+                # Iniciar sesión del intermediario
+                await intermediario.start_session(topic, usuarios_sala, idioma)
+                
+                # Iniciar temporizador de turnos
+                await intermediario.start_timer(config_ma.fase_segundos, config_ma.update_interval)
+                
+                created_rooms_initialized.append({
+                    "name": room_name,
+                    "status": "initialized",
+                    "session_id": str(room_session["id"])
+                })
+                
+                print(f"✓ Sala {room_name} inicializada correctamente")
+                
+            except Exception as e:
+                print(f"✗ Error inicializando sala {room_name}: {str(e)}")
+                created_rooms_initialized.append({
+                    "name": room_name,
+                    "status": "created_but_failed_init",
+                    "error": str(e)
+                })
+        
+        # Obtener lista actualizada de salas y estados
+        statuses = get_latest_room_statuses()
+        
+        # Emitir a todos los clientes conectados
+        await sio.emit("rooms_updated", statuses)
+        
+        return {
+            "status": "created_and_initialized",
+            "quantity_created": result["created"],
+            "quantity_failed": result["failed"],
+            "quantity_initialized": len([r for r in created_rooms_initialized if r.get("status") == "initialized"]),
+            "rooms": created_rooms_initialized
+        }
+    
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        print(f"Error creating rooms: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.delete("/api/rooms/{room_name}/sessions/active")
 async def terminate_session(room_name: str):
     try:
+        # Obtener ID de sesión activa ANTES de cerrar
+        session_id = get_active_room_session_id(room_name)
+        
         result = close_active_room_session(room_name)
         if not result:
             raise HTTPException(status_code=404, detail="No active session found")
+
+        # Exportar logs automáticamente si tenemos session_id
+        log_result = None
+        if session_id:
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            logs_dir = Path(__file__).parent / "logs"
+            log_filepath = logs_dir / f"{room_name}_{timestamp}.json"
+            
+            log_result = export_session_logs(session_id, str(log_filepath))
+            if log_result["success"]:
+                print(f"✓ Logs exportados a: {log_result['filepath']}")
+            else:
+                print(f"✗ Error al exportar logs: {log_result['error']}")
 
         if room_name in salas_activas:
             await salas_activas[room_name].stop_session()
             del salas_activas[room_name]
 
-        return {"status": "terminated"}
+        # Emitir evento Socket.io para notificar que se actualizó el estado de salas
+        statuses = get_latest_room_statuses()
+        await sio.emit("rooms_updated", statuses)
+
+        return {
+            "status": "terminated",
+            "log_saved": log_result["success"] if log_result else False,
+            "log_path": log_result["filepath"] if log_result else None
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
